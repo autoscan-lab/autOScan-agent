@@ -1,0 +1,28 @@
+# Environment
+.env
+.venv/
+venv/
+
+# Credentials
+credentials/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Auth state (in case Baileys auth state leaks in)
+auth/
