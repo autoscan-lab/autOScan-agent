@@ -3,13 +3,9 @@
 .venv/
 venv/
 
-# Credentials
-credentials/
-
 # Python
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
 *.egg-info/
 dist/
 build/
@@ -23,7 +19,3 @@ exports/
 
 # OS
 .DS_Store
-Thumbs.db
-
-# Auth state (in case Baileys auth state leaks in)
-auth/
