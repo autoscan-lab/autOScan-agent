@@ -19,9 +19,8 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Validate configuration on startup."""
     logger.info("autOScan-agent starting up")
-    logger.info("Allowed phone numbers: %d configured", len(settings.allowed_numbers_set))
     logger.info("Groq model: %s", settings.GROQ_MODEL)
-    logger.info("SSH target: %s@%s", settings.SSH_USER, settings.SSH_HOST)
+    logger.info("Engine URL: %s", settings.ENGINE_URL)
     yield
     logger.info("autOScan-agent shutting down")
 

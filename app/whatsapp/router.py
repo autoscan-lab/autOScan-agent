@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Query, Request, Response
 
 from app.config import settings
 from app.dispatch.handler import handle_message
-from app.whatsapp.client import send_text
+from app.whatsapp.client import send_document, send_text, upload_document
 from app.whatsapp.models import WebhookPayload
 
 logger = logging.getLogger(__name__)
@@ -38,11 +38,6 @@ async def receive_message(request: Request, background_tasks: BackgroundTasks):
     messages = payload.extract_messages()
 
     for sender, msg in messages:
-        # Access control
-        if sender not in settings.allowed_numbers_set:
-            logger.warning("Ignored message from unauthorized number: %s", sender)
-            continue
-
         background_tasks.add_task(_process_message, sender, msg)
 
     return Response(status_code=200)
@@ -63,7 +58,28 @@ async def _process_message(sender: str, msg) -> None:
             text=text or "",
             media_id=media_id,
         )
-        await send_text(sender, response)
+        if response.get("text"):
+            await send_text(sender, response["text"])
+
+        document_path = response.get("document_path")
+        if document_path:
+            media_id = await upload_document(
+                document_path,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            if media_id:
+                await send_document(
+                    sender,
+                    media_id,
+                    response.get("document_filename") or "grades.xlsx",
+                    "Generated grading workbook",
+                )
+            else:
+                logger.error("Workbook upload failed for %s: %s", sender, document_path)
+                await send_text(
+                    sender,
+                    "The grading workbook was generated, but I couldn't upload it to WhatsApp. Please try again in a moment.",
+                )
     except Exception:
         logger.exception("Error processing message from %s", sender)
         await send_text(sender, "Something went wrong processing your message. Please try again.")

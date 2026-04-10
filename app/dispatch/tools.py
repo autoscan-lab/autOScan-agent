@@ -5,7 +5,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "grade_submissions",
-            "description": "Grade student submissions for a given assignment. Triggers the full grading pipeline: upload zip, run autOScan-engine, parse results, write to Google Sheets.",
+            "description": "Grade student submissions for a given assignment. Triggers the full grading pipeline: upload zip, run autOScan-engine, parse results, and write an Excel workbook.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -39,7 +39,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "bump_grade",
-            "description": "Update a student's grade in the Google Sheet with a reason.",
+            "description": "Update a student's grade in the exported Excel workbook with a reason.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -75,7 +75,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "export_grades",
-            "description": "Confirm grades are written to the Google Sheet and return the sheet link.",
+            "description": "Confirm grades are written to the exported Excel workbook and return its path.",
             "parameters": {
                 "type": "object",
                 "properties": {},

@@ -13,14 +13,14 @@
 
 ## Overview
 
-WhatsApp-based interface to [autOScan-engine](https://github.com/autoscan-lab/autOScan-engine). Send a zip of student submissions via WhatsApp, get structured grades written to Google Sheets.
+WhatsApp-based interface to [autOScan-engine](https://github.com/autoscan-lab/autOScan-engine). Send a zip of student submissions via WhatsApp, get structured grades exported to an Excel workbook.
 
 ## Stack
 
 - FastAPI + Meta WhatsApp Cloud API
 - Groq (Llama 3.3 70B) for natural language dispatch
-- SSH/SFTP to university server for engine execution
-- Google Sheets API for grade output
+- HTTP calls to a private autOScan engine service
+- Excel workbook export for grade output
 
 ## Setup
 

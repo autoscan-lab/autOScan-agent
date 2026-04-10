@@ -36,6 +36,7 @@ def _new_session(now: datetime) -> dict:
     return {
         "current_assignment": None,
         "students": {},
+        "workbook_path": None,
         "rubric": None,
         "last_active": now,
     }

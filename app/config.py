@@ -15,22 +15,11 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
 
-    # SSH (university server)
-    SSH_HOST: str = "matagalls.salle.url.edu"
-    SSH_USER: str = "felipe.trejos"
-    SSH_KEY_PATH: str
-    SSH_REMOTE_DIR: str = "/home/felipe.trejos/autoscan-runs"
+    # Private grading engine
+    ENGINE_URL: str
 
-    # Google Sheets
-    GOOGLE_SHEETS_CREDS_FILE: str
-    GOOGLE_SHEETS_ID: str
-
-    # Access control (comma-separated phone numbers)
-    ALLOWED_PHONE_NUMBERS: str
-
-    @property
-    def allowed_numbers_set(self) -> set[str]:
-        return {n.strip() for n in self.ALLOWED_PHONE_NUMBERS.split(",") if n.strip()}
+    # Local workbook export
+    GRADE_EXPORT_DIR: str = "exports"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

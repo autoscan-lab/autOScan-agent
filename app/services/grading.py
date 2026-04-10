@@ -1,17 +1,14 @@
-"""Grading service — orchestrates the full grading pipeline.
-
-Pipeline: download zip from WhatsApp -> SSH upload -> run engine -> pull results -> write to sheets.
-"""
+"""Grading service — orchestrates the cloud grading pipeline."""
 
 import json
 import logging
 import tempfile
-from datetime import datetime
 from pathlib import Path
 
+import httpx
+
 from app.config import settings
-from app.services.sheets import write_grades
-from app.utils.ssh import download_file, run_command, upload_file
+from app.services.excel import write_grades
 from app.whatsapp.client import download_media
 
 logger = logging.getLogger(__name__)
@@ -24,22 +21,15 @@ async def run_grading(
 
     Steps:
         1. Download zip from WhatsApp (if media_id provided)
-        2. Upload zip to matagalls via SFTP
-        3. Unzip on remote server
-        4. Run autOScan-engine
-        5. Pull back JSON results
-        6. Parse results
-        7. Write to Google Sheets
+        2. Send zip to the private grading engine
+        3. Parse the engine response
+        4. Write results to an Excel workbook
 
     Returns:
         dict with 'summary' (str) and 'students' (dict).
     """
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = f"{settings.SSH_REMOTE_DIR}/{assignment_name}_{timestamp}"
-
     with tempfile.TemporaryDirectory() as tmpdir:
         local_zip = Path(tmpdir) / "submissions.zip"
-        local_results = Path(tmpdir) / "results.json"
 
         # Step 1: Download zip from WhatsApp
         if media_id:
@@ -54,78 +44,140 @@ async def run_grading(
                 "students": {},
             }
 
-        # Step 2: Create run directory and upload
-        logger.info("Creating remote run directory: %s", run_dir)
-        run_command(f"mkdir -p {run_dir}")
-        remote_zip = f"{run_dir}/submissions.zip"
-        upload_file(str(local_zip), remote_zip)
+        # Step 2: Send zip to the engine service
+        try:
+            results_data = await _grade_via_engine(local_zip)
+        except httpx.HTTPError as exc:
+            logger.exception("Engine request failed")
+            return {
+                "summary": f"Failed to contact the grading engine: {exc}",
+                "students": {},
+            }
 
-        # Step 3: Unzip on remote
-        logger.info("Unzipping on remote server")
-        stdout, stderr, exit_code = run_command(f"cd {run_dir} && unzip -o submissions.zip")
-        if exit_code != 0:
-            logger.error("Unzip failed: %s", stderr)
-            return {"summary": f"Failed to unzip submissions: {stderr}", "students": {}}
-
-        # Step 4: Run autOScan-engine
-        logger.info("Running autOScan-engine")
-        stdout, stderr, exit_code = run_command(
-            f"cd {run_dir} && autoscan-engine grade --output results.json ."
-        )
-        if exit_code != 0:
-            logger.error("Engine failed: %s", stderr)
-            return {"summary": f"Grading engine error: {stderr}", "students": {}}
-
-        # Step 5: Pull results
-        remote_results = f"{run_dir}/results.json"
-        download_file(remote_results, str(local_results))
-
-        # Step 6: Parse results
-        results_data = json.loads(local_results.read_text())
+        # Step 3: Parse results
         students = _parse_results(results_data)
 
-        # Step 7: Write to Google Sheets
-        await write_grades(settings.GOOGLE_SHEETS_ID, assignment_name, list(students.values()))
+        # Step 4: Write the Excel workbook
+        workbook_path = await write_grades(assignment_name, list(students.values()))
         logger.info("Grading complete for %s: %d students", assignment_name, len(students))
 
-        summary = _build_summary(assignment_name, students)
-        return {"summary": summary, "students": students}
+        summary = _build_summary(assignment_name, students, workbook_path)
+        return {
+            "summary": summary,
+            "students": students,
+            "workbook_path": str(workbook_path),
+            "workbook_filename": workbook_path.name,
+        }
+
+
+async def _grade_via_engine(local_zip: Path) -> dict:
+    timeout = httpx.Timeout(300.0, connect=60.0)
+    files = {"file": (local_zip.name, local_zip.read_bytes(), "application/zip")}
+
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        response = await client.post(f"{settings.ENGINE_URL.rstrip('/')}/grade", files=files)
+
+    if response.is_success:
+        return response.json()
+
+    detail = _extract_error_detail(response)
+    raise httpx.HTTPStatusError(detail, request=response.request, response=response)
+
+
+def _extract_error_detail(response: httpx.Response) -> str:
+    try:
+        payload = response.json()
+    except ValueError:
+        return response.text or f"HTTP {response.status_code}"
+
+    detail = payload.get("detail")
+    if isinstance(detail, str):
+        return detail
+    return response.text or f"HTTP {response.status_code}"
 
 
 def _parse_results(data: dict) -> dict[str, dict]:
-    """Parse autOScan-engine JSON output into a student dict.
-
-    TODO: Adjust parsing based on actual engine output format.
-    """
-    students = {}
+    """Parse engine JSON output into Excel workbook rows."""
+    students: dict[str, dict] = {}
     for entry in data.get("results", []):
-        sid = entry.get("student_id", "unknown")
+        sid = entry.get("id", "unknown")
+        tests = entry.get("tests", {})
+        total_tests = tests.get("total", 0)
+        passed_tests = tests.get("passed", 0)
+
+        banned_functions = sorted({hit.get("function", "") for hit in entry.get("banned_hits", []) if hit.get("function")})
+        notes = _build_notes(entry, tests)
+
         students[sid] = {
             "student_id": sid,
-            "name": entry.get("name", ""),
-            "grade": entry.get("grade", 0),
-            "compilation": entry.get("compilation", ""),
-            "tests_passed": entry.get("tests_passed", ""),
-            "banned_functions": entry.get("banned_functions", ""),
-            "similarity_score": entry.get("similarity_score", ""),
-            "notes": entry.get("notes", ""),
+            "name": "",
+            "grade": _derive_review_status(entry, tests),
+            "compilation": _compile_status(entry),
+            "tests_passed": f"{passed_tests}/{total_tests}" if total_tests else "",
+            "banned_functions": ", ".join(banned_functions),
+            "similarity_score": "",
+            "notes": notes,
         }
     return students
 
 
-def _build_summary(assignment_name: str, students: dict[str, dict]) -> str:
+def _derive_review_status(entry: dict, tests: dict) -> str:
+    if entry.get("compile_timeout") or not entry.get("compile_ok", False):
+        return "FAIL"
+
+    if tests.get("failed", 0) > 0 or tests.get("compile_failed", 0) > 0:
+        return "FAIL"
+
+    return "CHECK"
+
+
+def _compile_status(entry: dict) -> str:
+    if entry.get("compile_timeout"):
+        return "timed_out"
+    if entry.get("compile_ok"):
+        return "ok"
+    return "failed"
+
+
+def _build_notes(entry: dict, tests: dict) -> str:
+    notes: list[str] = []
+
+    stderr = (entry.get("stderr") or "").strip()
+    if stderr:
+        notes.append(f"Compile stderr: {stderr}")
+
+    failing_cases = []
+    for case in tests.get("cases", []):
+        status = case.get("status")
+        if status == "pass":
+            continue
+
+        label = case.get("name") or f"test_{case.get('index', '?')}"
+        message = case.get("message")
+        if message:
+            failing_cases.append(f"{label}: {status} ({message})")
+        else:
+            failing_cases.append(f"{label}: {status}")
+
+    if failing_cases:
+        notes.append("Tests: " + "; ".join(failing_cases))
+
+    return " | ".join(notes)
+
+
+def _build_summary(assignment_name: str, students: dict[str, dict], workbook_path: Path) -> str:
     """Build a human-readable summary of grading results."""
     if not students:
         return f"No results for {assignment_name}."
 
-    grades = [s["grade"] for s in students.values() if isinstance(s.get("grade"), (int, float))]
-    avg = sum(grades) / len(grades) if grades else 0
-    passed = sum(1 for g in grades if g >= 5)
+    fail_count = sum(1 for student in students.values() if student.get("grade") == "FAIL")
+    check_count = sum(1 for student in students.values() if student.get("grade") == "CHECK")
 
     lines = [
         f"Grading complete for *{assignment_name}*",
         f"Students: {len(students)}",
-        f"Average grade: {avg:.1f}",
-        f"Passed (>= 5): {passed}/{len(grades)}",
+        f"FAIL: {fail_count}",
+        f"CHECK: {check_count}",
+        f"Workbook: {workbook_path}",
     ]
     return "\n".join(lines)
