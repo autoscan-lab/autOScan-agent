@@ -80,11 +80,18 @@ async def run_grading(
         }
 
 
+def _engine_headers() -> dict:
+    if settings.ENGINE_SECRET:
+        return {"X-Autoscan-Secret": settings.ENGINE_SECRET}
+    return {}
+
+
 async def _setup_assignment(assignment_name: str) -> None:
     timeout = httpx.Timeout(60.0, connect=30.0)
     async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.post(
-            f"{settings.ENGINE_URL.rstrip('/')}/setup/{assignment_name}"
+            f"{settings.ENGINE_URL.rstrip('/')}/setup/{assignment_name}",
+            headers=_engine_headers(),
         )
     if not response.is_success:
         detail = _extract_error_detail(response)
@@ -97,7 +104,11 @@ async def _grade_via_engine(local_zip: Path) -> dict:
     files = {"file": (local_zip.name, local_zip.read_bytes(), "application/zip")}
 
     async with httpx.AsyncClient(timeout=timeout) as client:
-        response = await client.post(f"{settings.ENGINE_URL.rstrip('/')}/grade", files=files)
+        response = await client.post(
+            f"{settings.ENGINE_URL.rstrip('/')}/grade",
+            files=files,
+            headers=_engine_headers(),
+        )
 
     if response.is_success:
         return response.json()

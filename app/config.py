@@ -17,6 +17,7 @@ class Settings(BaseSettings):
 
     # Private grading engine
     ENGINE_URL: str
+    ENGINE_SECRET: str = ""
 
     # Local workbook export
     GRADE_EXPORT_DIR: str = "exports"
