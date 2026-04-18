@@ -44,7 +44,17 @@ async def run_grading(
                 "students": {},
             }
 
-        # Step 2: Send zip to the engine service
+        # Step 2: Load the assignment policy on the engine
+        try:
+            await _setup_assignment(assignment_name)
+        except httpx.HTTPError as exc:
+            logger.exception("Engine setup failed for assignment %s", assignment_name)
+            return {
+                "summary": f"Failed to load assignment '{assignment_name}' on the engine: {exc}",
+                "students": {},
+            }
+
+        # Step 3: Send zip to the engine service
         try:
             results_data = await _grade_via_engine(local_zip)
         except httpx.HTTPError as exc:
@@ -54,10 +64,10 @@ async def run_grading(
                 "students": {},
             }
 
-        # Step 3: Parse results
+        # Step 4: Parse results
         students = _parse_results(results_data)
 
-        # Step 4: Write the Excel workbook
+        # Step 5: Write the Excel workbook
         workbook_path = await write_grades(assignment_name, list(students.values()))
         logger.info("Grading complete for %s: %d students", assignment_name, len(students))
 
@@ -68,6 +78,18 @@ async def run_grading(
             "workbook_path": str(workbook_path),
             "workbook_filename": workbook_path.name,
         }
+
+
+async def _setup_assignment(assignment_name: str) -> None:
+    timeout = httpx.Timeout(60.0, connect=30.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        response = await client.post(
+            f"{settings.ENGINE_URL.rstrip('/')}/setup/{assignment_name}"
+        )
+    if not response.is_success:
+        detail = _extract_error_detail(response)
+        raise httpx.HTTPStatusError(detail, request=response.request, response=response)
+    logger.info("Engine configured for assignment %s", assignment_name)
 
 
 async def _grade_via_engine(local_zip: Path) -> dict:
