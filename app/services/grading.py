@@ -200,6 +200,5 @@ def _build_summary(assignment_name: str, students: dict[str, dict], workbook_pat
         f"Students: {len(students)}",
         f"FAIL: {fail_count}",
         f"CHECK: {check_count}",
-        f"Workbook: {workbook_path}",
     ]
     return "\n".join(lines)
