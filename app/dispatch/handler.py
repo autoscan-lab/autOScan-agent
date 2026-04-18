@@ -21,6 +21,10 @@ async def handle_message(sender: str, text: str, media_id: str | None = None) ->
     """
     session = get_session(sender)
 
+    # Persist the media_id in session so it survives a follow-up message
+    if media_id:
+        session["pending_media_id"] = media_id
+
     # If a document was uploaded with no text, treat it as a submission upload
     if media_id and not text:
         text = "I'm uploading a submission zip file."
@@ -47,7 +51,8 @@ async def _execute_tool(
     if name == "grade_submissions":
         assignment = args["assignment_name"]
         session["current_assignment"] = assignment
-        result = await run_grading(assignment, media_id=media_id)
+        effective_media_id = media_id or session.pop("pending_media_id", None)
+        result = await run_grading(assignment, media_id=effective_media_id)
         session["students"] = result.get("students", {})
         session["workbook_path"] = result.get("workbook_path")
         return {
