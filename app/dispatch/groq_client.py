@@ -32,19 +32,23 @@ async def dispatch(user_message: str) -> dict:
             {"type": "tool_call", "name": str, "arguments": dict}
             {"type": "text", "content": str}
     """
-    try:
-        response = await client.chat.completions.create(
-            model=settings.GROQ_MODEL,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_message},
-            ],
-            tools=TOOLS,
-            tool_choice="auto",
-        )
-    except BadRequestError:
-        logger.exception("Groq bad request — likely malformed tool call")
-        return {"type": "text", "content": "I couldn't understand that. Please send the zip file and lab name together (e.g. 'grade S0')."}
+    for attempt in range(2):
+        try:
+            response = await client.chat.completions.create(
+                model=settings.GROQ_MODEL,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": user_message},
+                ],
+                tools=TOOLS,
+                tool_choice="auto",
+            )
+            break
+        except BadRequestError:
+            if attempt == 1:
+                logger.exception("Groq bad request after retry — malformed tool call")
+                return {"type": "text", "content": "I couldn't understand that. Please send the zip file and lab name together (e.g. 'grade S0')."}
+            logger.warning("Groq bad request on attempt %d, retrying", attempt + 1)
 
     message = response.choices[0].message
 
