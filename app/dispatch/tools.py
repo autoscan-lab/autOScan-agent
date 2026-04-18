@@ -71,26 +71,4 @@ TOOLS = [
             },
         },
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "export_grades",
-            "description": "Confirm grades are written to the exported Excel workbook and return its path.",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "show_rubric",
-            "description": "Show the current rubric being applied for grading.",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-            },
-        },
-    },
 ]

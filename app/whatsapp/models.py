@@ -8,6 +8,7 @@ class WebhookMediaInfo(BaseModel):
     mime_type: str | None = None
     sha256: str | None = None
     filename: str | None = None
+    caption: str | None = None
 
 
 class WebhookMessage(BaseModel):
@@ -25,6 +26,8 @@ class WebhookMessage(BaseModel):
     def body(self) -> str | None:
         if self.text and "body" in self.text:
             return self.text["body"]
+        if self.document and self.document.caption:
+            return self.document.caption
         return None
 
     @property

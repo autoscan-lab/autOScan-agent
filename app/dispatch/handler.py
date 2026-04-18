@@ -25,6 +25,19 @@ async def handle_message(sender: str, text: str, media_id: str | None = None) ->
     if media_id:
         session["pending_media_id"] = media_id
 
+    # If a zip arrives and we already know the assignment, skip Groq and grade directly
+    if media_id and session.get("pending_assignment"):
+        assignment = session.pop("pending_assignment")
+        session["current_assignment"] = assignment
+        result = await run_grading(assignment, media_id=media_id)
+        session["students"] = result.get("students", {})
+        session["workbook_path"] = result.get("workbook_path")
+        return {
+            "text": result.get("summary", "Grading complete."),
+            "document_path": result.get("workbook_path"),
+            "document_filename": result.get("workbook_filename"),
+        }
+
     # If a document was uploaded with no text, treat it as a submission upload
     if media_id and not text:
         text = "I'm uploading a submission zip file."
@@ -50,8 +63,12 @@ async def _execute_tool(
     """Execute a tool call and return an outbound response payload."""
     if name == "grade_submissions":
         assignment = args["assignment_name"]
-        session["current_assignment"] = assignment
         effective_media_id = media_id or session.pop("pending_media_id", None)
+        if not effective_media_id:
+            session["pending_assignment"] = assignment
+            return {"text": f"Got it — *{assignment}*. Now send the zip file with the submissions."}
+        assignment = assignment or session.pop("pending_assignment", assignment)
+        session["current_assignment"] = assignment
         result = await run_grading(assignment, media_id=effective_media_id)
         session["students"] = result.get("students", {})
         session["workbook_path"] = result.get("workbook_path")
