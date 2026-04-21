@@ -273,3 +273,21 @@ export async function getExportFile(userId: string, exportId: string) {
     metadata,
   };
 }
+
+export async function getStoredFileByKey(key: string) {
+  const normalizedKey = key.trim().replace(/^\/+/, "");
+  if (!normalizedKey) {
+    return undefined;
+  }
+
+  const file = await getObject(normalizedKey);
+  if (!file) {
+    return undefined;
+  }
+
+  return {
+    bytes: file.bytes,
+    contentType: file.contentType,
+    key: normalizedKey,
+  };
+}

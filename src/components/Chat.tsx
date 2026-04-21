@@ -17,7 +17,7 @@ import {
   UserIcon,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ChainOfThought,
@@ -55,13 +55,50 @@ import {
 } from "@/components/ai-elements/tool";
 import { cn } from "@/lib/utils";
 
+const chatWatchdogMs = 180_000;
+const maxZipUploadBytes = 12 * 1024 * 1024;
+
 type ChatProps = {
+  initialChatId?: string;
+  initialMessages?: UIMessage[];
   userEmail?: string | null;
   userName?: string | null;
 };
 
+type UploadResponse = {
+  filename?: string;
+  mediaType?: string;
+  url: string;
+};
+
 function roleLabel(role: UIMessage["role"]) {
   return role === "user" ? "You" : role === "assistant" ? "autOScan" : role;
+}
+
+function messageDigest(messages: UIMessage[]) {
+  return messages
+    .map((message) => {
+      const partDigest = message.parts
+        .map((part) => {
+          if (part.type === "text") {
+            return `text:${part.text.length}`;
+          }
+
+          if (part.type === "file") {
+            return `file:${part.filename ?? "unknown"}`;
+          }
+
+          if ("state" in part && typeof part.state === "string") {
+            return `${part.type}:${part.state}`;
+          }
+
+          return part.type;
+        })
+        .join(",");
+
+      return `${message.id}:${message.role}:${partDigest}`;
+    })
+    .join("|");
 }
 
 function MessageAvatar({ role }: { role: UIMessage["role"] }) {
@@ -72,8 +109,8 @@ function MessageAvatar({ role }: { role: UIMessage["role"] }) {
       className={cn(
         "flex size-9 shrink-0 items-center justify-center rounded-full border",
         role === "user"
-          ? "border-[var(--rui-dark)] bg-[var(--rui-dark)] text-white"
-          : "border-[var(--rui-grey-tone-20)] bg-white text-[var(--rui-dark)]",
+          ? "border-[var(--chat-user-bubble)] bg-[var(--chat-user-bubble)] text-[var(--chat-user-text)]"
+          : "border-[var(--chat-border)] bg-[var(--chat-card)] text-[var(--foreground)]",
       )}
     >
       <Icon className="size-4" />
@@ -87,7 +124,7 @@ function textFromPart(part: UIMessage["parts"][number]) {
 
 function FilePart({ part }: { part: FileUIPart }) {
   return (
-    <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-[var(--rui-grey-tone-20)] bg-[var(--rui-surface)] px-3 py-1.5 text-sm text-[var(--rui-dark)]">
+    <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-[var(--chat-border)] bg-[var(--chat-soft)] px-3 py-1.5 text-sm text-[var(--foreground)]">
       <FileArchiveIcon className="size-4 shrink-0" />
       <span className="truncate">{part.filename ?? part.mediaType}</span>
     </div>
@@ -106,7 +143,7 @@ function ToolPart({ part }: { part: UIMessage["parts"][number] }) {
 
   return (
     <Tool
-      className="border-[var(--rui-grey-tone-20)] bg-white"
+      className="border-[var(--chat-border)] bg-[var(--chat-soft)]"
       defaultOpen={part.state !== "output-available"}
     >
       {part.type === "dynamic-tool" ? (
@@ -193,6 +230,21 @@ function MessageParts({ message }: { message: UIMessage }) {
   );
 }
 
+function EmptyChatState() {
+  return (
+    <section className="mx-auto flex min-h-[52vh] w-full max-w-3xl flex-col items-center justify-center px-4 py-12 text-center">
+      <h1 className="font-heading text-4xl tracking-[-0.04em] text-[var(--foreground)] md:text-6xl">
+        Ready to grade?
+      </h1>
+      <p className="mt-5 max-w-2xl text-base leading-7 text-[var(--rui-muted)] md:text-lg">
+        Attach one submissions zip and ask something like{" "}
+        <span className="font-medium text-[var(--foreground)]">“Grade S0”</span>
+        . You can then review, adjust, and export grades in the same chat.
+      </p>
+    </section>
+  );
+}
+
 function AttachmentPreview() {
   const attachments = usePromptInputAttachments();
 
@@ -204,7 +256,7 @@ function AttachmentPreview() {
     <div className="flex flex-wrap gap-2">
       {attachments.files.map((file) => (
         <button
-          className="inline-flex max-w-full items-center gap-2 rounded-full bg-[var(--rui-surface)] px-3 py-1.5 text-sm text-[var(--rui-dark)] transition-opacity hover:opacity-85"
+          className="inline-flex max-w-full items-center gap-2 rounded-full border border-[var(--chat-border)] bg-[var(--chat-soft)] px-3 py-1.5 text-sm text-[var(--foreground)] transition-opacity hover:opacity-85"
           key={file.id}
           onClick={() => attachments.remove(file.id)}
           type="button"
@@ -235,54 +287,139 @@ function PromptTools() {
   );
 }
 
-const suggestions = [
-  "Grade S0 from the attached zip",
-  "List students",
-  "Show latest summary",
-  "Export grades",
-];
-
-function EmptyChatState({ onSelect }: { onSelect: (prompt: string) => void }) {
-  return (
-    <section className="mx-auto flex min-h-[54vh] w-full max-w-3xl flex-col items-center justify-center px-4 py-14 text-center">
-      <h1 className="font-heading text-4xl tracking-[-0.04em] text-[var(--rui-dark)] md:text-6xl">
-        What are we grading?
-      </h1>
-      <p className="mt-5 max-w-xl text-base leading-7 text-[var(--rui-muted)] md:text-lg">
-        Attach a submissions zip and ask for grades, summaries, or exports.
-      </p>
-      <div className="mt-9 flex flex-wrap justify-center gap-3">
-        {suggestions.map((suggestion) => (
-          <button
-            className="rounded-full border border-[var(--rui-grey-tone-20)] bg-white px-4 py-2.5 text-sm font-medium text-[var(--rui-dark)] transition-colors hover:bg-[var(--rui-surface)]"
-            key={suggestion}
-            onClick={() => onSelect(suggestion)}
-            type="button"
-          >
-            {suggestion}
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-export function Chat({ userEmail, userName }: ChatProps) {
+export function Chat({
+  initialChatId,
+  initialMessages,
+  userEmail,
+  userName,
+}: ChatProps) {
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const [isClearingHistory, setIsClearingHistory] = useState(false);
+  const [runtimeError, setRuntimeError] = useState<string | null>(null);
+  const lastPersistedDigest = useRef(messageDigest(initialMessages ?? []));
 
-  const { error, messages, sendMessage, status, stop } = useChat({
+  const { error, id, messages, sendMessage, setMessages, status, stop } = useChat({
+    id: initialChatId,
+    messages: initialMessages,
     experimental_throttle: 80,
   });
 
-  const isBusy = status === "submitted" || status === "streaming";
+  const isModelBusy = status === "submitted" || status === "streaming";
+  const isBusy = isModelBusy || isUploadingAttachment;
   const displayName = userName || userEmail || "User";
   const messageList = useMemo(() => messages ?? [], [messages]);
 
+  const persistChatState = useCallback(
+    async (nextMessages: UIMessage[]) => {
+      const digest = messageDigest(nextMessages);
+      if (!digest || digest === lastPersistedDigest.current) {
+        return;
+      }
+
+      const response = await fetch("/api/chat/state", {
+        body: JSON.stringify({
+          chatId: id,
+          messages: nextMessages,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "PUT",
+      });
+
+      if (!response.ok) {
+        throw new Error("Could not persist chat state.");
+      }
+
+      lastPersistedDigest.current = digest;
+    },
+    [id],
+  );
+
+  const uploadAttachment = useCallback(async (part: FileUIPart) => {
+    if (part.url.startsWith("r2://")) {
+      return part;
+    }
+
+    const source = await fetch(part.url);
+    if (!source.ok) {
+      throw new Error("Could not read the attached zip file.");
+    }
+
+    const blob = await source.blob();
+    const filename = part.filename ?? "submissions.zip";
+    const mediaType = part.mediaType || blob.type || "application/zip";
+    const formData = new FormData();
+    formData.set("file", blob, filename);
+
+    const response = await fetch("/api/chat/uploads", {
+      body: formData,
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      throw new Error(detail || "Attachment upload failed.");
+    }
+
+    const payload = (await response.json()) as UploadResponse;
+    return {
+      ...part,
+      filename: payload.filename ?? filename,
+      mediaType: payload.mediaType ?? mediaType,
+      url: payload.url,
+    };
+  }, []);
+
+  const clearHistory = useCallback(async () => {
+    const response = await fetch("/api/chat/state", {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      throw new Error("Could not clear chat history.");
+    }
+
+    setMessages([]);
+    setAttachmentError(null);
+    setRuntimeError(null);
+    lastPersistedDigest.current = messageDigest([]);
+  }, [setMessages]);
+
+  useEffect(() => {
+    if (status !== "ready" && status !== "error") {
+      return;
+    }
+    if (messageList.length === 0) {
+      return;
+    }
+
+    void persistChatState(messageList).catch(() => {
+      // Non-blocking: the chat should continue even if persistence fails.
+    });
+  }, [messageList, persistChatState, status]);
+
+  useEffect(() => {
+    if (!isModelBusy) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      stop();
+      setRuntimeError(
+        "The assistant took too long and was stopped. Please retry your request.",
+      );
+    }, chatWatchdogMs);
+
+    return () => window.clearTimeout(timeout);
+  }, [isModelBusy, stop]);
+
   return (
-    <div className="flex min-h-screen flex-col bg-[#f7f7f7] text-[var(--foreground)]">
-      <header className="sticky top-0 z-20 border-b border-[var(--rui-grey-tone-20)] bg-white/85 px-4 py-3 backdrop-blur-xl md:px-6">
+    <div className="flex min-h-screen flex-col bg-[var(--chat-bg)] text-[var(--foreground)]">
+      <header className="sticky top-0 z-20 border-b border-[var(--chat-border)] bg-[var(--chat-header-bg)]/90 px-4 py-3 backdrop-blur-xl md:px-6">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
-          <p className="font-heading text-xl tracking-[-0.03em] text-[var(--rui-dark)]">
+          <p className="font-heading text-xl tracking-[-0.03em] text-[var(--foreground)]">
             autOScan
           </p>
 
@@ -291,7 +428,36 @@ export function Chat({ userEmail, userName }: ChatProps) {
               {displayName}
             </p>
             <button
-              className="inline-flex items-center gap-2 rounded-full border border-[var(--rui-grey-tone-20)] bg-white px-4 py-2 text-sm font-medium text-[var(--rui-dark)] transition hover:border-[var(--rui-dark)]"
+              className="inline-flex items-center gap-2 rounded-full border border-[var(--chat-border)] bg-[var(--chat-soft)] px-4 py-2 text-sm font-medium text-[var(--foreground)] transition hover:border-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-55"
+              disabled={isBusy || isClearingHistory || messageList.length === 0}
+              onClick={async () => {
+                if (
+                  !window.confirm(
+                    "Clear this chat history? This will remove your messages from this session.",
+                  )
+                ) {
+                  return;
+                }
+
+                setIsClearingHistory(true);
+                try {
+                  await clearHistory();
+                } catch (clearError) {
+                  setRuntimeError(
+                    clearError instanceof Error
+                      ? clearError.message
+                      : "Could not clear chat history.",
+                  );
+                } finally {
+                  setIsClearingHistory(false);
+                }
+              }}
+              type="button"
+            >
+              {isClearingHistory ? "Clearing..." : "Clear history"}
+            </button>
+            <button
+              className="inline-flex items-center gap-2 rounded-full border border-[var(--chat-border)] bg-[var(--chat-soft)] px-4 py-2 text-sm font-medium text-[var(--foreground)] transition hover:border-[var(--foreground)]"
               onClick={() => void signOut({ redirectTo: "/sign-in" })}
               type="button"
             >
@@ -302,11 +468,11 @@ export function Chat({ userEmail, userName }: ChatProps) {
         </div>
       </header>
 
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <Conversation className="bg-[radial-gradient(circle_at_top,#ffffff_0%,#ffffff_28%,#f7f7f7_72%)]">
-          <ConversationContent className="mx-auto w-full max-w-4xl gap-7 px-4 py-8 md:px-6">
+      <main className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+        <Conversation className="min-h-0 bg-[radial-gradient(circle_at_top,var(--chat-radial-top)_0%,var(--chat-radial-mid)_38%,var(--chat-bg)_78%)]">
+          <ConversationContent className="mx-auto w-full max-w-4xl gap-7 px-4 pb-44 pt-8 md:px-6 md:pb-52 md:pt-10">
             {messageList.length === 0 ? (
-              <EmptyChatState onSelect={(text) => sendMessage({ text })} />
+              <EmptyChatState />
             ) : (
               messageList.map((message) => (
                 <div
@@ -320,7 +486,7 @@ export function Chat({ userEmail, userName }: ChatProps) {
                     <MessageAvatar role={message.role} />
                   ) : null}
                   <Message
-                    className="max-w-[min(44rem,92%)]"
+                    className="max-w-[min(48rem,96%)]"
                     from={message.role}
                   >
                     <div
@@ -331,7 +497,7 @@ export function Chat({ userEmail, userName }: ChatProps) {
                     >
                       {roleLabel(message.role)}
                     </div>
-                    <MessageContent className="rounded-[20px] border border-[var(--rui-grey-tone-20)] bg-white px-4 py-3 text-[15px] leading-7 group-[.is-user]:rounded-[20px] group-[.is-user]:bg-[var(--rui-dark)] group-[.is-user]:text-white md:px-5 md:py-4">
+                    <MessageContent className="rounded-[22px] border border-[var(--chat-border)] bg-[var(--chat-card)] px-4 py-3 text-[15px] leading-7 text-[var(--foreground)] group-[.is-user]:border-[var(--chat-user-bubble)] group-[.is-user]:bg-[var(--chat-user-bubble)] group-[.is-user]:text-[var(--chat-user-text)] group-[.is-user]:shadow-none md:px-5 md:py-4">
                       <MessageParts message={message} />
                     </MessageContent>
                   </Message>
@@ -345,62 +511,108 @@ export function Chat({ userEmail, userName }: ChatProps) {
             {isBusy ? (
               <div className="flex items-center gap-2 text-sm text-[var(--rui-muted)]">
                 <Loader2Icon className="size-4 animate-spin" />
-                Working...
+                {isUploadingAttachment
+                  ? "Uploading zip..."
+                  : "autOScan is working..."}
+              </div>
+            ) : null}
+
+            {runtimeError ? (
+              <div className="rounded-[20px] border border-[var(--rui-warning)]/30 bg-[var(--rui-warning)]/10 p-4 text-sm text-[var(--rui-warning)]">
+                {runtimeError}
               </div>
             ) : null}
 
             {error ? (
-              <div className="rounded-[20px] border border-[var(--rui-danger)]/20 bg-[var(--rui-danger)]/10 p-4 text-sm text-[var(--rui-danger)]">
+              <div className="rounded-[20px] border border-[var(--rui-danger)]/30 bg-[var(--rui-danger)]/10 p-4 text-sm text-[var(--rui-danger)]">
                 {error.message}
               </div>
             ) : null}
           </ConversationContent>
-          <ConversationScrollButton />
+          <ConversationScrollButton className="bottom-28 z-20 md:bottom-32" />
         </Conversation>
 
-        <div className="border-t border-[var(--rui-grey-tone-20)] bg-white px-4 py-4 md:px-8">
-          <div className="mx-auto max-w-4xl">
-            {attachmentError ? (
-              <p className="mb-2 text-sm text-[var(--rui-danger)]">
-                {attachmentError}
-              </p>
-            ) : null}
-            <PromptInput
-              accept=".zip,application/zip,application/x-zip-compressed"
-              className="rounded-[28px] border border-[var(--rui-grey-tone-20)] bg-white p-2"
-              maxFileSize={4 * 1024 * 1024}
-              multiple={false}
-              onError={(err) =>
-                setAttachmentError(
-                  `${err.message} Please attach a .zip file under 4 MB.`,
-                )
-              }
-              onSubmit={({ files, text }) => {
-                setAttachmentError(null);
-                if (!text.trim() && files.length === 0) {
-                  return;
-                }
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30">
+          <div className="mx-auto w-full max-w-4xl px-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6 md:pb-6">
+            <div className="h-14 w-full bg-gradient-to-t from-[var(--chat-overlay)] to-transparent" />
 
-                sendMessage({ files, text });
-              }}
-            >
-              <PromptInputHeader>
-                <AttachmentPreview />
-              </PromptInputHeader>
-              <PromptInputBody>
-                <PromptInputTextarea placeholder="Ask autOScan to grade, review, adjust, or export..." />
-              </PromptInputBody>
-              <PromptInputFooter>
-                <PromptTools />
-                <div className="flex items-center gap-2">
+            <div className="-mt-3 pointer-events-auto">
+              {attachmentError ? (
+                <p className="mb-2 px-2 text-sm text-[var(--rui-danger)]">
+                  {attachmentError}
+                </p>
+              ) : null}
+              <PromptInput
+                accept=".zip,application/zip,application/x-zip-compressed"
+                className="rounded-[28px] border border-[var(--chat-border)] bg-[color:var(--chat-composer)] p-2 backdrop-blur-xl"
+                maxFileSize={maxZipUploadBytes}
+                multiple={false}
+                onError={(err) =>
+                  setAttachmentError(
+                    `${err.message} Please attach a .zip under ${
+                      maxZipUploadBytes / (1024 * 1024)
+                    } MB.`,
+                  )
+                }
+                onSubmit={async ({ files, text }) => {
+                  const trimmedText = text.trim();
+                  setAttachmentError(null);
+                  setRuntimeError(null);
+
+                  if (!trimmedText && files.length === 0) {
+                    return;
+                  }
+
+                  try {
+                    let preparedFiles: FileUIPart[] = [];
+                    if (files.length > 0) {
+                      setIsUploadingAttachment(true);
+                      try {
+                        preparedFiles = await Promise.all(
+                          files.map(uploadAttachment),
+                        );
+                      } finally {
+                        setIsUploadingAttachment(false);
+                      }
+                    }
+
+                    if (preparedFiles.length > 0 && trimmedText) {
+                      await sendMessage({ files: preparedFiles, text: trimmedText });
+                      return;
+                    }
+
+                    if (preparedFiles.length > 0) {
+                      await sendMessage({ files: preparedFiles });
+                      return;
+                    }
+
+                    await sendMessage({ text: trimmedText });
+                  } catch (submitError) {
+                    setIsUploadingAttachment(false);
+                    setAttachmentError(
+                      submitError instanceof Error
+                        ? submitError.message
+                        : "Could not send your request.",
+                    );
+                  }
+                }}
+              >
+                <PromptInputHeader>
+                  <AttachmentPreview />
+                </PromptInputHeader>
+                <PromptInputBody>
+                  <PromptInputTextarea placeholder="Attach a submissions zip and ask for grading..." />
+                </PromptInputBody>
+                <PromptInputFooter>
+                  <PromptTools />
                   <PromptInputSubmit
                     className="rounded-full"
                     onStop={stop}
                     status={status}
                   />
-                </div>
-              </PromptInputFooter>
-            </PromptInput>
+                </PromptInputFooter>
+              </PromptInput>
+            </div>
           </div>
         </div>
       </main>

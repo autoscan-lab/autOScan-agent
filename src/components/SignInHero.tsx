@@ -30,10 +30,24 @@ export function SignInHero() {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(255,255,255,0.12),transparent_32%),linear-gradient(90deg,rgba(5,5,5,0.96)_0%,rgba(5,5,5,0.78)_46%,rgba(5,5,5,0.58)_100%)]" />
 
       <section className="relative z-10 mx-auto flex w-full max-w-6xl flex-col px-6 py-6 md:px-10">
-        <div className="flex items-center">
-          <span className="font-heading text-xl tracking-[-0.03em]">
+        <div className="flex items-center justify-between gap-4">
+          <span className="font-heading text-2xl font-semibold tracking-[-0.025em] text-white">
             autOScan
           </span>
+          <a
+            aria-label="Open autOScan Agent GitHub repository"
+            className="inline-flex size-9 items-center justify-center text-white/78 transition hover:text-white"
+            href="https://github.com/autoscan-lab/autoscan-agent"
+            rel="noreferrer"
+            target="_blank"
+          >
+            <svg aria-hidden="true" className="size-5" viewBox="0 0 24 24">
+              <path
+                d="M12 .3a12 12 0 0 0-3.79 23.39c.6.1.82-.26.82-.58v-2.25c-3.34.73-4.04-1.42-4.04-1.42-.55-1.37-1.33-1.74-1.33-1.74-1.09-.74.08-.72.08-.72 1.2.08 1.83 1.2 1.83 1.2 1.07 1.79 2.8 1.27 3.49.97.1-.75.42-1.27.76-1.56-2.66-.3-5.47-1.3-5.47-5.8 0-1.28.47-2.33 1.23-3.16-.13-.3-.53-1.5.12-3.12 0 0 1-.31 3.3 1.2a11.8 11.8 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.66 1.63.26 2.83.13 3.12.77.83 1.23 1.88 1.23 3.16 0 4.5-2.8 5.5-5.48 5.8.43.37.82 1.1.82 2.23v3.3c0 .32.22.69.83.57A12 12 0 0 0 12 .3Z"
+                fill="currentColor"
+              />
+            </svg>
+          </a>
         </div>
 
         <div className="flex flex-1 items-center py-20 md:py-28">
@@ -41,13 +55,10 @@ export function SignInHero() {
             <h1 className="font-heading text-5xl leading-[0.95] tracking-[-0.055em] text-white md:text-7xl lg:text-8xl">
               Grade submissions in one conversation.
             </h1>
-            <p className="mt-7 max-w-2xl text-lg leading-8 text-white/68 md:text-xl">
-              Upload a zip, review results, and export your gradebook.
-            </p>
 
-            <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="mt-10 flex flex-col gap-4 sm:mt-12 sm:flex-row sm:items-center">
               <button
-                className="inline-flex w-full items-center justify-center gap-3 rounded-full border border-[#d9d9d9] bg-white px-7 py-4 text-base font-semibold text-black transition hover:-translate-y-0.5 hover:bg-[#f7f7f7] sm:w-auto"
+                className="inline-flex w-full items-center justify-center gap-3 rounded-full border border-[#d9d9d9] bg-white px-7 py-4 text-base font-semibold text-black transition hover:bg-[#f7f7f7] sm:w-auto"
                 onClick={() => void signIn("google", { redirectTo: "/" })}
                 type="button"
               >

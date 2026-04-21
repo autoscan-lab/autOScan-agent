@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import type { UploadedAttachment } from "@/lib/message-converters";
 import {
+  getStoredFileByKey,
   getLatestGradingSession,
   saveExportFile,
   saveGradingSession,
@@ -13,6 +14,7 @@ import {
   type EngineResult,
   type StoredGradingSession,
 } from "@/lib/r2-storage";
+import { userStorageKey } from "@/lib/storage-keys";
 
 export type GradingContext = {
   attachments?: UploadedAttachment[];
@@ -116,19 +118,53 @@ function selectedAttachment(
     };
   }
 
+  const candidates = (contextAttachments ?? []).filter(
+    (attachment) =>
+      typeof attachment.url === "string" &&
+      attachment.url.trim() !== "" &&
+      !attachment.url.startsWith("about:blank"),
+  );
+
   return (
-    contextAttachments?.find((attachment) =>
-      (attachment.filename ?? attachment.mediaType)
-        .toLowerCase()
-        .includes("zip"),
-    ) ?? contextAttachments?.[0]
+    [...candidates]
+      .reverse()
+      .find((attachment) =>
+        (attachment.filename ?? attachment.mediaType)
+          .toLowerCase()
+          .includes("zip"),
+      ) ?? candidates.at(-1)
   );
 }
 
 async function attachmentToFile(
   attachment: UploadedAttachment,
+  userId?: string,
 ): Promise<AttachmentFile> {
   const filename = attachment.filename ?? "submissions.zip";
+
+  if (attachment.url.startsWith("r2://")) {
+    const objectKey = attachment.url.slice("r2://".length).trim();
+    if (!objectKey) {
+      throw new Error("Uploaded attachment reference is invalid.");
+    }
+
+    const normalizedUserId = contextUserId(userId);
+    const expectedUserKey = userStorageKey(normalizedUserId);
+    if (!objectKey.includes(`/${expectedUserKey}/`)) {
+      throw new Error("Uploaded attachment does not belong to this user.");
+    }
+
+    const object = await getStoredFileByKey(objectKey);
+    if (!object) {
+      throw new Error("Uploaded attachment was not found. Please re-upload it.");
+    }
+
+    return {
+      bytes: object.bytes,
+      filename,
+      mediaType: object.contentType ?? attachment.mediaType ?? "application/zip",
+    };
+  }
 
   if (attachment.url.startsWith("data:")) {
     const match = /^data:([^;,]+)?(;base64)?,([\s\S]*)$/.exec(attachment.url);
@@ -332,7 +368,7 @@ export const gradeSubmissions = tool<
 
     const userId = contextUserId(runContext?.context.userId);
     const runId = randomUUID();
-    const file = await attachmentToFile(attachment);
+    const file = await attachmentToFile(attachment, userId);
     const upload = await saveUploadedFile({
       bytes: file.bytes,
       contentType: file.mediaType,
@@ -354,7 +390,8 @@ export const gradeSubmissions = tool<
 
     return result;
   },
-  timeoutMs: 60_000,
+  timeoutBehavior: "error_as_result",
+  timeoutMs: 240_000,
 });
 
 export const listStudents = tool<

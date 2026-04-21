@@ -27,7 +27,8 @@ The app runs the OpenAI Agents SDK TypeScript loop directly in `src/app/api/chat
 - `@openai/agents-extensions/ai-sdk` and `ai-sdk-ui`
 - Groq Llama 3.3 70B via `@ai-sdk/groq`
 - AI Elements + shadcn/ui components
-- Cloudflare R2 for durable uploads, grading sessions, and Excel exports
+- MongoDB for durable chat history/state
+- Cloudflare R2 for uploads, grading sessions, and Excel exports
 - Revolut-inspired `docs/DESIGN.md` theme
 
 ## Engine Compatibility
@@ -37,7 +38,7 @@ The current tool layer supports the existing engine API:
 - `POST /setup/{assignment}`
 - `POST /grade` with multipart `file`
 
-The web app stores uploads, latest grading sessions, manual grade bumps, and Excel exports in Cloudflare R2 under `R2_APP_PREFIX` so Vercel serverless restarts do not erase grading state.
+The web app stores chat transcripts in MongoDB and stores uploads, latest grading sessions, manual grade bumps, and Excel exports in Cloudflare R2 under `R2_APP_PREFIX` so Vercel serverless restarts do not erase grading state.
 
 Default R2 object layout:
 
@@ -61,7 +62,6 @@ web/
 
 ```bash
 pnpm typecheck
-pnpm test
 pnpm lint
 pnpm build
 ```
