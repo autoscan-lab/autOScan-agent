@@ -9,6 +9,7 @@ const allowedEmails = () =>
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: {
+    error: "/access-denied",
     signIn: "/sign-in",
   },
   providers: [
@@ -24,10 +25,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn({ user }) {
       const email = user.email?.toLowerCase();
       if (!email) {
-        return false;
+        return "/access-denied";
       }
 
-      return allowedEmails().includes(email);
+      if (!allowedEmails().includes(email)) {
+        return "/access-denied";
+      }
+
+      return true;
     },
   },
 });

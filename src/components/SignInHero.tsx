@@ -1,10 +1,18 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 
 import FaultyTerminal from "@/components/FaultyTerminal";
 
-export function SignInHero() {
+type SignInHeroProps = {
+  mode?: "sign-in" | "denied";
+};
+
+export function SignInHero({ mode = "sign-in" }: SignInHeroProps) {
+  const router = useRouter();
+  const isDenied = mode === "denied";
+
   return (
     <main className="relative flex min-h-screen overflow-hidden bg-[#050505] text-white">
       <div className="absolute inset-0 opacity-80">
@@ -53,35 +61,47 @@ export function SignInHero() {
         <div className="flex flex-1 items-center py-20 md:py-28">
           <div className="max-w-3xl">
             <h1 className="font-heading text-5xl leading-[0.95] tracking-[-0.055em] text-white md:text-7xl lg:text-8xl">
-              Grade submissions in one conversation.
+              {isDenied
+                ? "Access denied."
+                : "Grade submissions in one conversation."}
             </h1>
 
             <div className="mt-10 flex flex-col gap-4 sm:mt-12 sm:flex-row sm:items-center">
-              <button
-                className="inline-flex w-full items-center justify-center gap-3 rounded-full border border-[#d9d9d9] bg-white px-7 py-4 text-base font-semibold text-black transition hover:bg-[#f7f7f7] sm:w-auto"
-                onClick={() => void signIn("google", { redirectTo: "/" })}
-                type="button"
-              >
-                <svg aria-hidden="true" className="size-5" viewBox="0 0 24 24">
-                  <path
-                    d="M22 12.27c0-.77-.07-1.51-.2-2.23H12v4.22h5.6a4.8 4.8 0 0 1-2.08 3.15v2.62h3.37c1.97-1.82 3.11-4.5 3.11-7.76Z"
-                    fill="#000000"
-                  />
-                  <path
-                    d="M12 22c2.7 0 4.96-.9 6.61-2.44l-3.37-2.62c-.93.63-2.13 1-3.24 1-2.49 0-4.6-1.68-5.35-3.95H3.16v2.7A9.98 9.98 0 0 0 12 22Z"
-                    fill="#4a4a4a"
-                  />
-                  <path
-                    d="M6.65 13.99A6 6 0 0 1 6.35 12c0-.69.12-1.36.3-1.99v-2.7H3.16A10 10 0 0 0 2 12c0 1.61.39 3.13 1.16 4.69l3.49-2.7Z"
-                    fill="#808080"
-                  />
-                  <path
-                    d="M12 6.06c1.47 0 2.79.5 3.83 1.48l2.87-2.87C16.95 3.02 14.7 2 12 2A9.98 9.98 0 0 0 3.16 7.31l3.49 2.7c.75-2.27 2.86-3.95 5.35-3.95Z"
-                    fill="#1f1f1f"
-                  />
-                </svg>
-                Continue with Google
-              </button>
+              {isDenied ? (
+                <button
+                  className="inline-flex w-full items-center justify-center rounded-full border border-[#d9d9d9] bg-white px-5 py-3 text-sm font-semibold text-black transition hover:bg-[#f7f7f7] sm:w-auto"
+                  onClick={() => router.replace("/")}
+                  type="button"
+                >
+                  Go back
+                </button>
+              ) : (
+                <button
+                  className="inline-flex w-full items-center justify-center gap-2.5 rounded-full border border-[#d9d9d9] bg-white px-5 py-3 text-sm font-semibold text-black transition hover:bg-[#f7f7f7] sm:w-auto"
+                  onClick={() => void signIn("google", { redirectTo: "/" })}
+                  type="button"
+                >
+                  <svg aria-hidden="true" className="size-5" viewBox="0 0 24 24">
+                    <path
+                      d="M22 12.27c0-.77-.07-1.51-.2-2.23H12v4.22h5.6a4.8 4.8 0 0 1-2.08 3.15v2.62h3.37c1.97-1.82 3.11-4.5 3.11-7.76Z"
+                      fill="#000000"
+                    />
+                    <path
+                      d="M12 22c2.7 0 4.96-.9 6.61-2.44l-3.37-2.62c-.93.63-2.13 1-3.24 1-2.49 0-4.6-1.68-5.35-3.95H3.16v2.7A9.98 9.98 0 0 0 12 22Z"
+                      fill="#4a4a4a"
+                    />
+                    <path
+                      d="M6.65 13.99A6 6 0 0 1 6.35 12c0-.69.12-1.36.3-1.99v-2.7H3.16A10 10 0 0 0 2 12c0 1.61.39 3.13 1.16 4.69l3.49-2.7Z"
+                      fill="#808080"
+                    />
+                    <path
+                      d="M12 6.06c1.47 0 2.79.5 3.83 1.48l2.87-2.87C16.95 3.02 14.7 2 12 2A9.98 9.98 0 0 0 3.16 7.31l3.49 2.7c.75-2.27 2.86-3.95 5.35-3.95Z"
+                      fill="#1f1f1f"
+                    />
+                  </svg>
+                  Continue with Google
+                </button>
+              )}
             </div>
           </div>
         </div>
