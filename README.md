@@ -1,11 +1,12 @@
 <h1 align="center">autOScan-agent</h1>
 
 <p align="center">
-  <strong>WhatsApp agent for grading OS lab submissions.</strong>
+  <strong>Agentic web chat for autOScan grading.</strong>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.12+-3776AB?style=flat&logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/next.js-16-000000?style=flat&logo=nextdotjs&logoColor=white" />
+  <img src="https://img.shields.io/badge/react-19-61DAFB?style=flat&logo=react&logoColor=111111" />
   <img src="https://img.shields.io/badge/license-MIT-24292e?style=flat" />
 </p>
 
@@ -13,35 +14,59 @@
 
 ## Overview
 
-WhatsApp interface to [autOScan-engine](https://github.com/autoscan-lab/autOScan-engine). Send a zip of student submissions with a caption like `grade S0`, get a summary and an Excel workbook back. No tooling required on the user's end.
+`autOScan-agent` is a Next.js web chat app. Users sign in with Google, chat with the grading assistant, attach a submissions zip, and receive grading results inline.
 
-The agent uses Groq to interpret natural language, pulls the lab policy from Cloudflare R2, forwards the zip to the engine for compilation and static analysis, and replies with the results.
-
-## How it works
-
-1. User sends a zip + lab name (e.g. `grade S0`) via WhatsApp
-2. Agent downloads the zip and loads the policy for that lab from R2
-3. Engine compiles each submission and checks for banned functions
-4. Agent sends back a summary and an `.xlsx` workbook with per-student results
+The app runs the OpenAI Agents SDK TypeScript loop directly in `src/app/api/chat/route.ts`. Groq serves Llama 3.3 70B through the AI SDK adapter, and tool calls reach the existing `autOScan-engine` Fly.io machine.
 
 ## Stack
 
-- FastAPI + Meta WhatsApp Cloud API
-- Groq (Llama 3.3 70B)
-- Cloudflare R2 for lab policy storage
-- autOScan-engine (HTTP)
-- Excel workbook export via openpyxl
+- Next.js 16 App Router on Node.js runtime
+- React 19 + Tailwind CSS 4
+- Auth.js / NextAuth 5 with Google OAuth
+- OpenAI Agents SDK TypeScript
+- `@openai/agents-extensions/ai-sdk` and `ai-sdk-ui`
+- Groq Llama 3.3 70B via `@ai-sdk/groq`
+- AI Elements + shadcn/ui components
+- Cloudflare R2 for durable uploads, grading sessions, and Excel exports
+- Revolut-inspired `docs/DESIGN.md` theme
 
-## Deploy
+## Engine Compatibility
 
-1. Copy `.env.example` to `.env` and fill in your credentials
-2. Deploy the engine first — see [autOScan-engine](https://github.com/autoscan-lab/autOScan-engine)
-3. `fly secrets import < .env && fly deploy`
-4. Point your Meta webhook to `https://<your-app>.fly.dev/webhook`
+The current tool layer supports the existing engine API:
 
-## What's next
+- `POST /setup/{assignment}`
+- `POST /grade` with multipart `file`
 
-See [TODO.md](TODO.md).
+The web app stores uploads, latest grading sessions, manual grade bumps, and Excel exports in Cloudflare R2 under `R2_APP_PREFIX` so Vercel serverless restarts do not erase grading state.
+
+Default R2 object layout:
+
+```text
+web/
+  uploads/<user-hash>/<run-id>/submissions.zip
+  runs/<user-hash>/<run-id>.json
+  users/<user-hash>/latest.json
+  exports/<user-hash>/<export-id>.json
+  exports/<user-hash>/<export-id>/<filename>.xlsx
+```
+
+## Local Setup
+
+1. Copy `.env.example` to `.env` and fill in the values.
+2. Install dependencies with `pnpm install`.
+3. Run `pnpm dev`.
+4. Open `http://localhost:3000`.
+
+## Verification
+
+```bash
+pnpm typecheck
+pnpm test
+pnpm lint
+pnpm build
+```
+
+
 
 ## License
 
