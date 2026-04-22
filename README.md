@@ -14,15 +14,19 @@
 
 ## What It Does
 
-`autOScan-agent` is a Next.js app: Google sign-in, chat, zip upload, inline grading. The server agent lives at `src/app/api/chat/route.ts` (OpenAI Agents SDK) and uses Groq (Llama 3.3 70B) plus your **autOScan-engine** for `/setup` and `/grade`. Chat state in MongoDB; uploads and exports in Cloudflare R2. UI tokens are described in `docs/DESIGN.md`.
+`autOScan-agent` is a web chat app for running autOScan grades without leaving the browser.  
+Sign in with Google, upload a submissions zip, provide the assignment name, and the assistant runs the grader and returns a clean results summary in chat.  
+Chat history is saved in MongoDB, and uploaded files plus grading run metadata are stored in Cloudflare R2.
 
 ---
 
 ## Features
 
-- Grading, student list/detail, manual grade bump, Excel export via agent tools
-- Attachments to R2; latest run + export metadata in the same bucket
-- Durable chat id + messages (Mongo) so sessions survive reloads
+- Single tool surface for grading: `grade_submissions(assignment_name)`
+- Grading from attached zip files in chat
+- Compact markdown results table (`studentId`, `status`, `grade`)
+- Durable chat id + messages in MongoDB (sessions survive reloads)
+- Run artifacts in R2 (uploads + latest run pointer per user)
 
 ---
 
@@ -66,9 +70,9 @@ With `R2_APP_PREFIX` (default `web`):
 web/uploads/<user-hash>/<run-id>/<file>.zip
 web/runs/<user-hash>/<run-id>.json
 web/users/<user-hash>/latest.json
-web/exports/<user-hash>/<export-id>.json
-web/exports/<user-hash>/<export-id>/<file>.xlsx
 ```
+
+`latest.json` is a pointer to the newest run id for that user.
 
 ---
 
