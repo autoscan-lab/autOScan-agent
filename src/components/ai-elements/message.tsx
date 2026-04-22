@@ -28,7 +28,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { Streamdown } from "streamdown";
+import { Streamdown, type Components } from "streamdown";
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage["role"];
@@ -323,6 +323,46 @@ export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
 const streamdownPlugins = { cjk, code, math, mermaid };
 
+const streamdownComponents: Components = {
+  table: ({ className, children, ...props }) => (
+    <div className="my-4 overflow-x-auto rounded-xl border border-border bg-card/40">
+      <table
+        className={cn(
+          "my-0 w-full border-collapse overflow-visible rounded-none text-sm",
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </table>
+    </div>
+  ),
+  thead: ({ className, ...props }) => (
+    <thead className={cn("bg-muted/70", className)} {...props} />
+  ),
+  tbody: ({ className, ...props }) => (
+    <tbody className={cn("[&_tr:last-child_td]:border-b-0", className)} {...props} />
+  ),
+  tr: ({ className, ...props }) => (
+    <tr className={cn("hover:bg-muted/20", className)} {...props} />
+  ),
+  th: ({ className, ...props }) => (
+    <th
+      className={cn(
+        "border-b border-border px-4 py-2.5 text-left font-semibold text-foreground",
+        className
+      )}
+      {...props}
+    />
+  ),
+  td: ({ className, ...props }) => (
+    <td
+      className={cn("border-b border-t-0 border-border px-4 py-2.5 align-top", className)}
+      {...props}
+    />
+  ),
+};
+
 export const MessageResponse = memo(
   ({ className, ...props }: MessageResponseProps) => (
     <Streamdown
@@ -330,6 +370,8 @@ export const MessageResponse = memo(
         "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
         className
       )}
+      components={streamdownComponents}
+      controls={{ table: false }}
       plugins={streamdownPlugins}
       {...props}
     />

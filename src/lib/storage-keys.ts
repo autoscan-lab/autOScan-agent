@@ -7,13 +7,6 @@ type RunKeyInput = {
   userId: string;
 };
 
-type ExportKeyInput = {
-  exportId: string;
-  filename: string;
-  prefix?: string;
-  userId: string;
-};
-
 export function storagePrefix(prefix = process.env.R2_APP_PREFIX ?? "web") {
   return prefix.trim().replace(/^\/+|\/+$/g, "") || "web";
 }
@@ -43,18 +36,6 @@ export function buildRunKeys(input: RunKeyInput) {
     latestKey: `${prefix}/users/${userKey}/latest.json`,
     runKey: `${prefix}/runs/${userKey}/${input.runId}.json`,
     uploadKey: `${prefix}/uploads/${userKey}/${input.runId}/${uploadFilename}`,
-    userKey,
-  };
-}
-
-export function buildExportKeys(input: ExportKeyInput) {
-  const prefix = storagePrefix(input.prefix);
-  const userKey = userStorageKey(input.userId);
-  const filename = safeObjectFilename(input.filename, "grades.xlsx");
-
-  return {
-    fileKey: `${prefix}/exports/${userKey}/${input.exportId}/${filename}`,
-    metadataKey: `${prefix}/exports/${userKey}/${input.exportId}.json`,
     userKey,
   };
 }

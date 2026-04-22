@@ -53,8 +53,8 @@ export function toStudentRow(raw: Record<string, unknown>): StudentRow {
   return {
     bannedCount: num(raw.banned_count),
     compileOk: bool(raw.compile_ok),
-    grade: num(raw.manual_grade) ?? num(raw.grade),
-    notes: str(raw.manual_reason) ?? str(raw.notes),
+    grade: num(raw.grade),
+    notes: str(raw.notes),
     sourceText: str(raw.source_code),
     status: str(raw.status),
     studentId: studentIdOf(raw),
@@ -80,18 +80,4 @@ export function latestFromSession(
     assignmentName: session.assignmentName ?? null,
     students: studentsFromResult(session.result),
   };
-}
-
-/** Find and return the raw engine record for a student id (for mutation). */
-export function findRawStudent(
-  session: StoredGradingSession | undefined,
-  studentId: string,
-): Record<string, unknown> | undefined {
-  const rows = session?.result?.results;
-  if (!Array.isArray(rows)) {
-    return undefined;
-  }
-  return rows
-    .filter(isRecord)
-    .find((row) => studentIdOf(row) === studentId);
 }

@@ -1,20 +1,14 @@
 import { randomUUID } from "node:crypto";
 
 import { tool } from "@openai/agents";
-import ExcelJS from "exceljs";
-import { z } from "zod";
 
 import type { UploadedAttachment } from "@/lib/message-converters";
 import {
-  findRawStudent,
   studentsFromResult,
-  toStudentRow,
   type StudentRow,
 } from "@/lib/grading";
 import {
   getStoredFileByKey,
-  getLatestGradingSession,
-  saveExportFile,
   saveGradingSession,
   saveUploadedFile,
   type EngineResult,
@@ -33,8 +27,56 @@ type AttachmentFile = {
   mediaType: string;
 };
 
-const xlsxContentType =
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+type ToolArgs = Record<string, unknown>;
+type ToolParameter = {
+  description?: string;
+  type: "number" | "string";
+};
+type NonStrictToolSchema = {
+  additionalProperties: true;
+  properties: Record<string, ToolParameter>;
+  required: string[];
+  type: "object";
+};
+
+const gradeSubmissionsSchema: NonStrictToolSchema = {
+  additionalProperties: true,
+  properties: {
+    assignmentName: {
+      description:
+        "Assignment name in camelCase. Alias for assignment_name (for example S0).",
+      type: "string",
+    },
+    assignment_name: {
+      description: "Assignment name in snake_case (for example S0).",
+      type: "string",
+    },
+  },
+  required: [],
+  type: "object",
+};
+
+function isToolArgs(value: unknown): value is ToolArgs {
+  return typeof value === "object" && value !== null;
+}
+
+function pickStringArg(args: unknown, ...keys: string[]) {
+  if (!isToolArgs(args)) {
+    return undefined;
+  }
+
+  for (const key of keys) {
+    const value = args[key];
+    if (typeof value === "string") {
+      const normalized = value.trim();
+      if (normalized) {
+        return normalized;
+      }
+    }
+  }
+
+  return undefined;
+}
 
 const engineBaseUrl = () => {
   const url = process.env.ENGINE_URL?.trim();
@@ -73,10 +115,6 @@ async function parseEngineResponse(response: Response) {
 
 function contextUserId(userId?: string) {
   return userId?.trim() || "anonymous";
-}
-
-async function latestSession(userId?: string) {
-  return getLatestGradingSession(contextUserId(userId));
 }
 
 async function rememberSession(
@@ -203,10 +241,6 @@ async function gradeWithCurrentEngine(
   return parseEngineResponse(response);
 }
 
-async function currentStudents(userId?: string): Promise<StudentRow[]> {
-  return studentsFromResult((await latestSession(userId))?.result);
-}
-
 /** Drop fields that serialize to null so tool outputs stay lean for the LLM. */
 function prune(row: StudentRow) {
   const entries = Object.entries(row).filter(
@@ -215,68 +249,25 @@ function prune(row: StudentRow) {
   return Object.fromEntries(entries) as Partial<Omit<StudentRow, "sourceText">>;
 }
 
-async function buildGradesWorkbook(
-  assignmentName: string | undefined,
-  students: StudentRow[],
-) {
-  const workbook = new ExcelJS.Workbook();
-  workbook.creator = "autOScan";
-  workbook.created = new Date();
-
-  const worksheet = workbook.addWorksheet("Grades");
-  worksheet.columns = [
-    { header: "Student ID", key: "studentId", width: 24 },
-    { header: "Status", key: "status", width: 16 },
-    { header: "Grade", key: "grade", width: 12 },
-    { header: "Compile OK", key: "compileOk", width: 14 },
-    { header: "Tests Passed", key: "testsPassed", width: 16 },
-    { header: "Banned Count", key: "bannedCount", width: 16 },
-    { header: "Notes", key: "notes", width: 42 },
-  ];
-
-  worksheet.getRow(1).font = { bold: true };
-  worksheet.getRow(1).alignment = { vertical: "middle" };
-
-  for (const student of students) {
-    worksheet.addRow({
-      bannedCount: student.bannedCount ?? "",
-      compileOk:
-        typeof student.compileOk === "boolean" ? student.compileOk : "",
-      grade: student.grade ?? "",
-      notes: student.notes ?? "",
-      status: student.status ?? "",
-      studentId: student.studentId,
-      testsPassed: student.testsPassed ?? "",
-    });
-  }
-
-  const buffer = await workbook.xlsx.writeBuffer();
-  const safeAssignment =
-    (assignmentName ?? "grades")
-      .replace(/[^a-z0-9._-]+/gi, "-")
-      .replace(/^-+|-+$/g, "") || "grades";
-
-  return {
-    bytes: Buffer.from(buffer),
-    filename: `${safeAssignment}.xlsx`,
-  };
-}
-
-export const gradeSubmissions = tool<
-  z.ZodObject<{
-    assignment_name: z.ZodString;
-  }>,
-  GradingContext
->({
+export const gradeSubmissions = tool<typeof gradeSubmissionsSchema, GradingContext>({
   description:
     "Grade student submissions from the zip file the user attached to this chat.",
   name: "grade_submissions",
-  parameters: z.object({
-    assignment_name: z
-      .string()
-      .describe("The assignment name, for example S0."),
-  }),
-  execute: async ({ assignment_name }, runContext) => {
+  parameters: gradeSubmissionsSchema,
+  strict: false,
+  execute: async (args, runContext) => {
+    const assignmentName = pickStringArg(
+      args,
+      "assignment_name",
+      "assignmentName",
+    );
+    if (!assignmentName) {
+      return {
+        message:
+          "Missing assignment name. Ask the user to provide it (for example S0).",
+      };
+    }
+
     const attachment = pickZipAttachment(runContext?.context.attachments);
 
     if (!attachment) {
@@ -296,11 +287,11 @@ export const gradeSubmissions = tool<
       runId,
       userId,
     });
-    const result = await gradeWithCurrentEngine(assignment_name, file);
+    const result = await gradeWithCurrentEngine(assignmentName, file);
     const now = new Date().toISOString();
 
     await rememberSession(userId, {
-      assignmentName: assignment_name,
+      assignmentName,
       createdAt: now,
       id: runId,
       result,
@@ -310,131 +301,11 @@ export const gradeSubmissions = tool<
 
     const students = studentsFromResult(result);
     return {
-      assignmentName: assignment_name,
+      assignmentName,
       studentCount: students.length,
       students: students.map(prune),
     };
   },
   timeoutBehavior: "error_as_result",
   timeoutMs: 240_000,
-});
-
-export const listStudents = tool<
-  z.ZodObject<Record<string, never>>,
-  GradingContext
->({
-  description:
-    "List all graded students with their scores from the latest run.",
-  name: "list_students",
-  parameters: z.object({}),
-  execute: async (_args, runContext) => {
-    const students = await currentStudents(runContext?.context.userId);
-    if (students.length === 0) {
-      return {
-        message:
-          "No graded students are available in this chat session yet. Run grade_submissions first.",
-      };
-    }
-
-    return { students: students.map(prune) };
-  },
-});
-
-export const showStudent = tool<
-  z.ZodObject<{ student_id: z.ZodString }>,
-  GradingContext
->({
-  description:
-    "Show detailed results for a specific student from the latest run.",
-  name: "show_student",
-  parameters: z.object({ student_id: z.string() }),
-  execute: async ({ student_id }, runContext) => {
-    const students = await currentStudents(runContext?.context.userId);
-    const student = students.find((row) => row.studentId === student_id);
-
-    if (!student) {
-      return {
-        message: `Student '${student_id}' was not found in the latest run.`,
-      };
-    }
-
-    return student;
-  },
-});
-
-export const bumpGrade = tool<
-  z.ZodObject<{
-    student_id: z.ZodString;
-    new_grade: z.ZodNumber;
-    reason: z.ZodString;
-  }>,
-  GradingContext
->({
-  description:
-    "Manually adjust a student's grade with a reason in the latest session.",
-  name: "bump_grade",
-  parameters: z.object({
-    new_grade: z.number(),
-    reason: z.string(),
-    student_id: z.string(),
-  }),
-  execute: async ({ student_id, new_grade, reason }, runContext) => {
-    const userId = contextUserId(runContext?.context.userId);
-    const session = await latestSession(userId);
-    const rawStudent = findRawStudent(session, student_id);
-
-    if (!session || !rawStudent) {
-      return {
-        message: `Student '${student_id}' was not found in the latest run.`,
-      };
-    }
-
-    rawStudent.manual_grade = new_grade;
-    rawStudent.manual_reason = reason;
-    session.updatedAt = new Date().toISOString();
-    await rememberSession(userId, session);
-
-    return {
-      message: "Grade adjusted and saved.",
-      student: prune(toStudentRow(rawStudent)),
-    };
-  },
-});
-
-export const exportGrades = tool<
-  z.ZodObject<Record<string, never>>,
-  GradingContext
->({
-  description: "Export all grades as an Excel file and return a download URL.",
-  name: "export_grades",
-  parameters: z.object({}),
-  execute: async (_args, runContext) => {
-    const userId = contextUserId(runContext?.context.userId);
-    const session = await latestSession(userId);
-    const students = await currentStudents(userId);
-
-    if (students.length === 0) {
-      return {
-        message:
-          "No grades are available to export in this chat session yet. Run grade_submissions first.",
-      };
-    }
-
-    const exportFile = await buildGradesWorkbook(
-      session?.assignmentName,
-      students,
-    );
-    const metadata = await saveExportFile({
-      bytes: exportFile.bytes,
-      contentType: xlsxContentType,
-      filename: exportFile.filename,
-      runId: session?.id,
-      userId,
-    });
-
-    return {
-      downloadUrl: `/api/exports/${metadata.id}`,
-      filename: metadata.filename,
-    };
-  },
 });

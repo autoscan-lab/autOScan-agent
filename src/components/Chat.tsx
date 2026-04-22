@@ -12,18 +12,14 @@ import {
 } from "ai";
 import {
   BrainIcon,
-  DownloadIcon,
   FileArchiveIcon,
-  ListTodoIcon,
   LogOutIcon,
   PaperclipIcon,
   PanelRightCloseIcon,
   PanelRightOpenIcon,
-  PencilLineIcon,
   PlayIcon,
   RefreshCwIcon,
   Trash2Icon,
-  UserSearchIcon,
   WrenchIcon,
   XIcon,
 } from "lucide-react";
@@ -273,11 +269,7 @@ function prettyToolTitle(toolName: string) {
 }
 
 const toolIconMap: Record<string, LucideIcon> = {
-  bump_grade: PencilLineIcon,
-  export_grades: DownloadIcon,
   grade_submissions: PlayIcon,
-  list_students: ListTodoIcon,
-  show_student: UserSearchIcon,
 };
 
 function iconForTool(toolName: string): LucideIcon {
@@ -331,108 +323,6 @@ function summarizeTool(toolName: string, part: ToolPart): ToolSummary {
             ? `Finished ${count} submission${count === 1 ? "" : "s"}`
             : undefined,
         label: assignment ? `Graded ${assignment}` : "Graded submissions",
-      };
-    }
-
-    case "list_students": {
-      if (isRunning) {
-        return { chips: [], label: "Listing students…" };
-      }
-      const students =
-        output && typeof output === "object"
-          ? ((output as Record<string, unknown>).students as unknown[])
-          : undefined;
-      const count = Array.isArray(students) ? students.length : undefined;
-      const chips = Array.isArray(students)
-        ? students
-            .slice(0, 6)
-            .map((entry) =>
-              entry && typeof entry === "object"
-                ? formatStudentName(
-                    str((entry as Record<string, unknown>).studentId) ??
-                      str((entry as Record<string, unknown>).student_id) ??
-                      "",
-                  )
-                : "",
-            )
-            .filter((name) => name.length > 0)
-        : [];
-
-      return {
-        chips,
-        description:
-          count !== undefined
-            ? `${count} student${count === 1 ? "" : "s"}`
-            : undefined,
-        label: "Listed students",
-      };
-    }
-
-    case "show_student": {
-      const studentId = formatStudentName(
-        str(input?.student_id) ??
-          (output && typeof output === "object"
-            ? str((output as Record<string, unknown>).studentId) ?? ""
-            : ""),
-      );
-
-      if (isRunning) {
-        return {
-          chips: [],
-          label: studentId
-            ? `Looking up ${studentId}…`
-            : "Looking up student…",
-        };
-      }
-
-      const grade =
-        output && typeof output === "object"
-          ? num((output as Record<string, unknown>).grade)
-          : undefined;
-
-      return {
-        chips: [],
-        description:
-          grade !== undefined ? `Grade ${grade}` : undefined,
-        label: studentId ? `Loaded ${studentId}` : "Loaded student",
-      };
-    }
-
-    case "bump_grade": {
-      const studentId = formatStudentName(str(input?.student_id) ?? "");
-      const newGrade = num(input?.new_grade);
-
-      if (isRunning) {
-        return {
-          chips: [],
-          label: studentId
-            ? `Adjusting ${studentId}…`
-            : "Adjusting grade…",
-        };
-      }
-
-      return {
-        chips: [],
-        description: str(input?.reason),
-        label:
-          studentId && newGrade !== undefined
-            ? `Set ${studentId} → ${newGrade}`
-            : "Adjusted grade",
-      };
-    }
-
-    case "export_grades": {
-      if (isRunning) {
-        return { chips: [], label: "Exporting grades…" };
-      }
-      const filename =
-        output && typeof output === "object"
-          ? str((output as Record<string, unknown>).filename)
-          : undefined;
-      return {
-        chips: [],
-        description: filename,
-        label: "Exported grades",
       };
     }
 

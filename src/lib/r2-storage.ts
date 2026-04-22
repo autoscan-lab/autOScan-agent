@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import {
   GetObjectCommand,
   PutObjectCommand,
@@ -8,7 +6,7 @@ import {
   type GetObjectCommandOutput,
 } from "@aws-sdk/client-s3";
 
-import { buildExportKeys, buildRunKeys, safeObjectFilename } from "@/lib/storage-keys";
+import { buildRunKeys, safeObjectFilename } from "@/lib/storage-keys";
 
 export type EngineResult = Record<string, unknown>;
 
@@ -28,28 +26,11 @@ export type StoredGradingSession = {
   uploads: StoredUpload[];
 };
 
-export type StoredExportMetadata = {
-  contentType: string;
-  createdAt: string;
-  filename: string;
-  id: string;
-  key: string;
-  runId?: string;
-};
-
 type SaveUploadInput = {
   bytes: Buffer;
   contentType: string;
   filename: string;
   runId: string;
-  userId: string;
-};
-
-type SaveExportInput = {
-  bytes: Buffer;
-  contentType: string;
-  filename: string;
-  runId?: string;
   userId: string;
 };
 
@@ -241,52 +222,6 @@ export async function clearLatestGradingSession(userId: string) {
   });
 
   await putJson(keys.latestKey, { runId: "", updatedAt: new Date().toISOString() });
-}
-
-export async function saveExportFile(input: SaveExportInput) {
-  const id = randomUUID();
-  const filename = safeObjectFilename(input.filename, "grades.xlsx");
-  const keys = buildExportKeys({
-    exportId: id,
-    filename,
-    userId: input.userId,
-  });
-  const metadata: StoredExportMetadata = {
-    contentType: input.contentType,
-    createdAt: new Date().toISOString(),
-    filename,
-    id,
-    key: keys.fileKey,
-    runId: input.runId,
-  };
-
-  await putObject(keys.fileKey, input.bytes, input.contentType);
-  await putJson(keys.metadataKey, metadata);
-
-  return metadata;
-}
-
-export async function getExportFile(userId: string, exportId: string) {
-  const keys = buildExportKeys({
-    exportId,
-    filename: "grades.xlsx",
-    userId,
-  });
-  const metadata = await getJson<StoredExportMetadata>(keys.metadataKey);
-
-  if (!metadata) {
-    return undefined;
-  }
-
-  const file = await getObject(metadata.key);
-  if (!file) {
-    return undefined;
-  }
-
-  return {
-    bytes: file.bytes,
-    metadata,
-  };
 }
 
 export async function getStoredFileByKey(key: string) {
