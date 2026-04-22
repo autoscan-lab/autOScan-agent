@@ -1,64 +1,78 @@
 <h1 align="center">autOScan-agent</h1>
 
 <p align="center">
-  <strong>Agentic web chat for autOScan grading.</strong>
+  <strong>Web chat for autOScan grading with a tool-calling agent.</strong>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/next.js-16-000000?style=flat&logo=nextdotjs&logoColor=white" />
-  <img src="https://img.shields.io/badge/react-19-61DAFB?style=flat&logo=react&logoColor=111111" />
-  <img src="https://img.shields.io/badge/license-MIT-24292e?style=flat" />
+  <a href="#"><img src="https://img.shields.io/badge/next.js-16-000000?style=flat&logo=nextdotjs&logoColor=white" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/react-19-61DAFB?style=flat&logo=react&logoColor=111111" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/license-MIT-24292e?style=flat" /></a>
 </p>
 
 ---
 
-## Overview
+## What It Does
 
-`autOScan-agent` is a Next.js web chat app. Users sign in with Google, chat with the grading assistant, attach a submissions zip, and receive grading results inline.
+`autOScan-agent` is a Next.js app: Google sign-in, chat, zip upload, inline grading. The server agent lives at `src/app/api/chat/route.ts` (OpenAI Agents SDK) and uses Groq (Llama 3.3 70B) plus your **autOScan-engine** for `/setup` and `/grade`. Chat state in MongoDB; uploads and exports in Cloudflare R2. UI tokens are described in `docs/DESIGN.md`.
 
-The app runs the OpenAI Agents SDK TypeScript loop directly in `src/app/api/chat/route.ts`. Groq serves Llama 3.3 70B through the AI SDK adapter, and tool calls reach the existing `autOScan-engine` Fly.io machine.
+---
 
-## Stack
+## Features
 
-- Next.js 16 App Router on Node.js runtime
-- React 19 + Tailwind CSS 4
-- Auth.js / NextAuth 5 with Google OAuth
-- OpenAI Agents SDK TypeScript
-- `@openai/agents-extensions/ai-sdk` and `ai-sdk-ui`
-- Groq Llama 3.3 70B via `@ai-sdk/groq`
-- AI Elements + shadcn/ui components
-- MongoDB for durable chat history/state
-- Cloudflare R2 for uploads, grading sessions, and Excel exports
-- Revolut-inspired `docs/DESIGN.md` theme
+- Grading, student list/detail, manual grade bump, Excel export via agent tools
+- Attachments to R2; latest run + export metadata in the same bucket
+- Durable chat id + messages (Mongo) so sessions survive reloads
 
-## Engine Compatibility
+---
 
-The current tool layer supports the existing engine API:
+## Installation
 
-- `POST /setup/{assignment}`
-- `POST /grade` with multipart `file`
+- Node 20+ (`package.json` `engines.node`)
+- `pnpm` (repo uses `pnpm-lock.yaml`)
 
-The web app stores chat transcripts in MongoDB and stores uploads, latest grading sessions, manual grade bumps, and Excel exports in Cloudflare R2 under `R2_APP_PREFIX` so Vercel serverless restarts do not erase grading state.
-
-Default R2 object layout:
-
-```text
-web/
-  uploads/<user-hash>/<run-id>/submissions.zip
-  runs/<user-hash>/<run-id>.json
-  users/<user-hash>/latest.json
-  exports/<user-hash>/<export-id>.json
-  exports/<user-hash>/<export-id>/<filename>.xlsx
+```bash
+pnpm install
 ```
 
-## Local Setup
+---
 
-1. Copy `.env.example` to `.env` and fill in the values.
-2. Install dependencies with `pnpm install`.
-3. Run `pnpm dev`.
-4. Open `http://localhost:3000`.
+## Configuration
 
-## Verification
+Copy `.env.example` → `.env` and set at least:
+
+| Area | Variables |
+|------|------------|
+| Auth | `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `AUTH_SECRET`, `ALLOWED_EMAILS` |
+| Model | `GROQ_API_KEY` |
+| Engine | `ENGINE_URL`, `ENGINE_SECRET` |
+| R2 | `R2_*`, `R2_APP_PREFIX` |
+| DB | `MONGODB_URI`, `MONGODB_DB_NAME` |
+
+---
+
+## Quickstart
+
+1. `cp .env.example .env` and fill the table above.
+2. `pnpm dev` → [http://localhost:3000](http://localhost:3000)
+
+---
+
+## R2 layout
+
+With `R2_APP_PREFIX` (default `web`):
+
+```text
+web/uploads/<user-hash>/<run-id>/<file>.zip
+web/runs/<user-hash>/<run-id>.json
+web/users/<user-hash>/latest.json
+web/exports/<user-hash>/<export-id>.json
+web/exports/<user-hash>/<export-id>/<file>.xlsx
+```
+
+---
+
+## Scripts
 
 ```bash
 pnpm typecheck
@@ -66,7 +80,7 @@ pnpm lint
 pnpm build
 ```
 
-
+---
 
 ## License
 

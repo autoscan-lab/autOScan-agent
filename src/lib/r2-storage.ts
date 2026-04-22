@@ -228,6 +228,21 @@ export async function getLatestGradingSession(userId: string) {
   return getJson<StoredGradingSession>(runKeys.runKey);
 }
 
+/**
+ * Clear the "latest run" pointer for a user. We intentionally keep individual
+ * run/upload objects around (they are addressable by id) — this just hides
+ * them from the inspector so a reset chat does not surface stale results.
+ */
+export async function clearLatestGradingSession(userId: string) {
+  const keys = buildRunKeys({
+    runId: "latest",
+    uploadFilename: "submissions.zip",
+    userId,
+  });
+
+  await putJson(keys.latestKey, { runId: "", updatedAt: new Date().toISOString() });
+}
+
 export async function saveExportFile(input: SaveExportInput) {
   const id = randomUUID();
   const filename = safeObjectFilename(input.filename, "grades.xlsx");

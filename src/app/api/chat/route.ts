@@ -36,12 +36,36 @@ export async function POST(req: Request) {
         userId: session.user.email ?? session.user.name ?? "unknown-user",
       },
       conversationId: chatId,
-      maxTurns: 10,
+      maxTurns: 4,
       stream: true,
     });
 
     return createAiSdkUiMessageStreamResponse(stream);
   } catch (error) {
+    const err = error as {
+      cause?: { data?: unknown; responseBody?: string };
+      responseBody?: string;
+    };
+    const cause = err?.cause;
+    let providerDetail: unknown;
+    const raw =
+      typeof cause?.responseBody === "string"
+        ? cause.responseBody
+        : typeof err?.responseBody === "string"
+          ? err.responseBody
+          : undefined;
+    if (raw) {
+      try {
+        providerDetail = JSON.parse(raw) as unknown;
+      } catch {
+        providerDetail = raw;
+      }
+    }
+    console.error("[/api/chat] agent run failed", {
+      cause,
+      error,
+      providerDetail,
+    });
     const message =
       error instanceof Error ? error.message : "Unexpected chat error.";
     return new Response(message, { status: 500 });

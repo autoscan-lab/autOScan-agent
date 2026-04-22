@@ -8,7 +8,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-mono: var(--font-mono-stack);
   --font-heading: var(--font-heading);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -48,159 +48,126 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-:root {
-  color-scheme: light;
-  --rui-dark: #191c1f;
-  --rui-white: #ffffff;
-  --rui-surface: #f4f4f4;
-  --rui-blue: #494fdf;
-  --rui-action-blue: #4f55f1;
-  --rui-blue-text: #376cd5;
-  --rui-danger: #e23b4a;
-  --rui-deep-pink: #e61e49;
-  --rui-warning: #ec7e00;
-  --rui-yellow: #b09000;
-  --rui-teal: #00a87e;
-  --rui-light-green: #428619;
-  --rui-light-blue: #007bc2;
-  --rui-brown: #936d62;
-  --rui-muted: #505a63;
-  --rui-muted-soft: #8d969e;
-  --rui-grey-tone-20: #c9c9cd;
-
-  --background: #ffffff;
-  --foreground: #191c1f;
-  --card: #ffffff;
-  --card-foreground: #191c1f;
-  --popover: #ffffff;
-  --popover-foreground: #191c1f;
-  --primary: #191c1f;
-  --primary-foreground: #ffffff;
-  --secondary: #f4f4f4;
-  --secondary-foreground: #191c1f;
-  --muted: #f4f4f4;
-  --muted-foreground: #505a63;
-  --accent: #f4f4f4;
-  --accent-foreground: #191c1f;
-  --destructive: #e23b4a;
-  --border: #c9c9cd;
-  --input: #c9c9cd;
-  --ring: #494fdf;
-  --chart-1: #494fdf;
-  --chart-2: #00a87e;
-  --chart-3: #e61e49;
-  --chart-4: #ec7e00;
-  --chart-5: #936d62;
-  --radius: 1.25rem;
-  --sidebar: #191c1f;
-  --sidebar-foreground: #ffffff;
-  --sidebar-primary: #ffffff;
-  --sidebar-primary-foreground: #191c1f;
-  --sidebar-accent: rgba(244, 244, 244, 0.1);
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: rgba(255, 255, 255, 0.12);
-  --sidebar-ring: #ffffff;
-
-  --font-sans: var(--font-inter), Inter, Arial, sans-serif;
-  --font-heading: "Aeonik Pro", var(--font-inter), Inter, Arial, sans-serif;
-
-  --chat-bg: #f7f7f7;
-  --chat-card: #ffffff;
-  --chat-soft: #f4f4f4;
-  --chat-border: #c9c9cd;
-  --chat-header-bg: #ffffff;
-  --chat-composer: rgba(255, 255, 255, 0.94);
-  --chat-overlay: #f7f7f7;
-  --chat-radial-top: #ffffff;
-  --chat-radial-mid: #f8f8f8;
-  --chat-user-bubble: #191c1f;
-  --chat-user-text: #ffffff;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --background: #191c1f;
-    --foreground: #ffffff;
-    --card: #202428;
-    --card-foreground: #ffffff;
-    --popover: #202428;
-    --popover-foreground: #ffffff;
-    --primary: #ffffff;
-    --primary-foreground: #191c1f;
-    --secondary: rgba(244, 244, 244, 0.1);
-    --secondary-foreground: #ffffff;
-    --muted: rgba(244, 244, 244, 0.1);
-    --muted-foreground: #c9c9cd;
-    --accent: rgba(244, 244, 244, 0.1);
-    --accent-foreground: #ffffff;
-    --destructive: #e23b4a;
-    --border: rgba(255, 255, 255, 0.12);
-    --input: rgba(255, 255, 255, 0.16);
-    --ring: #ffffff;
-    --sidebar: #191c1f;
-    --sidebar-foreground: #ffffff;
-    --sidebar-primary: #ffffff;
-    --sidebar-primary-foreground: #191c1f;
-    --sidebar-accent: rgba(244, 244, 244, 0.1);
-    --sidebar-accent-foreground: #ffffff;
-    --sidebar-border: rgba(255, 255, 255, 0.12);
-    --sidebar-ring: #ffffff;
-
-    --chat-bg: #16191c;
-    --chat-card: #21252a;
-    --chat-soft: #252a30;
-    --chat-border: rgba(255, 255, 255, 0.14);
-    --chat-header-bg: #1a1e22;
-    --chat-composer: rgba(26, 30, 34, 0.93);
-    --chat-overlay: #16191c;
-    --chat-radial-top: #21252a;
-    --chat-radial-mid: #171a1e;
-    --chat-user-bubble: #ffffff;
-    --chat-user-text: #191c1f;
-  }
-}
-
+/*
+ * Linear-inspired dark theme.
+ * The app is dark-native; light palette is intentionally not shipped.
+ * See docs/DESIGN.md for the full token map.
+ */
+:root,
 .dark {
   color-scheme: dark;
-  --background: #191c1f;
-  --foreground: #ffffff;
-  --card: #202428;
-  --card-foreground: #ffffff;
-  --popover: #202428;
-  --popover-foreground: #ffffff;
-  --primary: #ffffff;
-  --primary-foreground: #191c1f;
-  --secondary: rgba(244, 244, 244, 0.1);
-  --secondary-foreground: #ffffff;
-  --muted: rgba(244, 244, 244, 0.1);
-  --muted-foreground: #c9c9cd;
-  --accent: rgba(244, 244, 244, 0.1);
-  --accent-foreground: #ffffff;
-  --destructive: #e23b4a;
-  --border: rgba(255, 255, 255, 0.12);
-  --input: rgba(255, 255, 255, 0.16);
-  --ring: #ffffff;
-  --sidebar: #191c1f;
-  --sidebar-foreground: #ffffff;
-  --sidebar-primary: #ffffff;
-  --sidebar-primary-foreground: #191c1f;
-  --sidebar-accent: rgba(244, 244, 244, 0.1);
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: rgba(255, 255, 255, 0.12);
-  --sidebar-ring: #ffffff;
 
-  --chat-bg: #16191c;
-  --chat-card: #21252a;
-  --chat-soft: #252a30;
-  --chat-border: rgba(255, 255, 255, 0.14);
-  --chat-header-bg: #1a1e22;
-  --chat-composer: rgba(26, 30, 34, 0.93);
-  --chat-overlay: #16191c;
-  --chat-radial-top: #21252a;
-  --chat-radial-mid: #171a1e;
-  --chat-user-bubble: #ffffff;
-  --chat-user-text: #191c1f;
+  /* Linear raw tokens */
+  --linear-bg: #08090a;
+  --linear-panel: #0f1011;
+  --linear-surface: #191a1b;
+  --linear-surface-hover: #28282c;
+  --linear-text: #f7f8f8;
+  --linear-text-secondary: #d0d6e0;
+  --linear-text-muted: #8a8f98;
+  --linear-text-subtle: #62666d;
+  --linear-brand: #5e6ad2;
+  --linear-accent: #7170ff;
+  --linear-accent-hover: #828fff;
+  --linear-success: #10b981;
+  --linear-success-strong: #27a644;
+  --linear-danger: #ef6a73;
+  --linear-warning: #b09000;
+  --linear-border: rgba(255, 255, 255, 0.08);
+  --linear-border-subtle: rgba(255, 255, 255, 0.05);
+  --linear-border-solid: #23252a;
+  --linear-ghost: rgba(255, 255, 255, 0.02);
+  --linear-ghost-hover: rgba(255, 255, 255, 0.05);
+
+  /* Back-compat aliases (used in some components) */
+  --rui-dark: var(--linear-bg);
+  --rui-white: var(--linear-text);
+  --rui-surface: var(--linear-surface);
+  --rui-blue: var(--linear-brand);
+  --rui-action-blue: var(--linear-accent);
+  --rui-blue-text: var(--linear-accent);
+  --rui-danger: var(--linear-danger);
+  --rui-deep-pink: var(--linear-danger);
+  --rui-warning: var(--linear-accent-hover);
+  --rui-yellow: var(--linear-warning);
+  --rui-teal: var(--linear-success);
+  --rui-light-green: var(--linear-success-strong);
+  --rui-light-blue: var(--linear-accent);
+  --rui-brown: #936d62;
+  --rui-muted: var(--linear-text-muted);
+  --rui-muted-soft: var(--linear-text-subtle);
+  --rui-grey-tone-20: var(--linear-text-secondary);
+
+  /* shadcn / ai-elements role tokens */
+  --background: var(--linear-bg);
+  --foreground: var(--linear-text);
+  --card: var(--linear-panel);
+  --card-foreground: var(--linear-text);
+  --popover: var(--linear-surface);
+  --popover-foreground: var(--linear-text);
+  --primary: var(--linear-brand);
+  --primary-foreground: #ffffff;
+  --secondary: var(--linear-surface);
+  --secondary-foreground: var(--linear-text);
+  --muted: var(--linear-surface);
+  --muted-foreground: var(--linear-text-muted);
+  --accent: var(--linear-accent);
+  --accent-foreground: #ffffff;
+  --destructive: var(--linear-danger);
+  --border: var(--linear-border);
+  --input: var(--linear-border);
+  --ring: var(--linear-accent);
+  --chart-1: var(--linear-accent);
+  --chart-2: var(--linear-success);
+  --chart-3: var(--linear-danger);
+  --chart-4: var(--linear-accent-hover);
+  --chart-5: #936d62;
+  --radius: 0.5rem;
+  --sidebar: var(--linear-panel);
+  --sidebar-foreground: var(--linear-text);
+  --sidebar-primary: var(--linear-brand);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--linear-ghost-hover);
+  --sidebar-accent-foreground: var(--linear-text);
+  --sidebar-border: var(--linear-border);
+  --sidebar-ring: var(--linear-accent);
+
+  --font-sans: var(--font-inter), Inter, "SF Pro Display", -apple-system,
+    system-ui, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans",
+    "Helvetica Neue", sans-serif;
+  --font-heading: var(--font-inter), Inter, "SF Pro Display", -apple-system,
+    system-ui, sans-serif;
+  --font-mono-stack: "Berkeley Mono", var(--font-geist-mono), ui-monospace,
+    "SF Mono", Menlo, monospace;
+
+  /* Chat-specific tokens (consumed throughout Chat.tsx) */
+  --chat-bg: var(--linear-bg);
+  --chat-card: var(--linear-panel);
+  --chat-soft: var(--linear-surface);
+  --chat-panel: var(--linear-panel);
+  --chat-border: var(--linear-border);
+  --chat-border-soft: var(--linear-border-subtle);
+  --chat-header-bg: rgba(8, 9, 10, 0.86);
+  --chat-composer: rgba(8, 9, 10, 0.92);
+  --chat-overlay: rgba(0, 0, 0, 0.85);
+  --chat-radial-top: #131416;
+  --chat-radial-mid: var(--linear-bg);
+  --chat-user-bubble: rgba(113, 112, 255, 0.14);
+  --chat-user-text: var(--linear-text);
+  --chat-ghost: var(--linear-ghost);
+  --chat-ghost-hover: var(--linear-ghost-hover);
+  --chat-accent: var(--linear-accent);
+  --chat-accent-hover: var(--linear-accent-hover);
+  --chat-text-secondary: var(--linear-text-secondary);
+  --chat-text-muted: var(--linear-text-muted);
+
+  /* Linear's multi-layer dialog / focus shadow stacks */
+  --shadow-dialog: 0 8px 2px rgba(0, 0, 0, 0),
+    0 5px 2px rgba(0, 0, 0, 0.01), 0 3px 2px rgba(0, 0, 0, 0.04),
+    0 1px 1px rgba(0, 0, 0, 0.07), 0 0 1px rgba(0, 0, 0, 0.08);
+  --shadow-focus: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-ring: 0 0 0 1px rgba(0, 0, 0, 0.2);
+  --shadow-inset-panel: inset 0 0 12px rgba(0, 0, 0, 0.2);
 }
 
 @layer base {
@@ -210,17 +177,33 @@
 
   html {
     @apply font-sans;
+    color-scheme: dark;
   }
 
   body {
     @apply bg-background text-foreground;
-    letter-spacing: 0.01em;
+    font-feature-settings: "cv01" 1, "ss03" 1;
+    letter-spacing: 0;
   }
 
   button,
   a,
   textarea {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+  }
+
+  /*
+   * Apply Linear's aggressive negative tracking at display sizes.
+   * Below 24px tracking relaxes back to 0 (handled per-component).
+   */
+  h1 {
+    letter-spacing: -0.022em;
+  }
+  h2 {
+    letter-spacing: -0.019em;
+  }
+  h3 {
+    letter-spacing: -0.012em;
   }
 
   table {
@@ -237,5 +220,36 @@
 
   code {
     @apply rounded-md bg-muted px-1.5 py-0.5 font-mono text-sm;
+  }
+
+  /*
+   * Shadcn's <InputGroup /> ships with a heavy 3px focus halo (`ring-3` +
+   * `ring-ring/50`). That reads as a neon outline on our near-black canvas,
+   * which clashes with Linear's "focus is a subtle multi-layer shadow" rule.
+   *
+   * Tame it app-wide: 1px accent-tinted outline via box-shadow, no ring.
+   */
+  [data-slot="input-group"]:has([data-slot="input-group-control"]:focus-visible) {
+    border-color: var(--linear-border-solid) !important;
+    --tw-ring-shadow: 0 0 #0000 !important;
+    --tw-ring-offset-shadow: 0 0 #0000 !important;
+    box-shadow:
+      0 0 0 1px rgba(113, 112, 255, 0.22),
+      0 12px 32px -12px rgba(0, 0, 0, 0.6),
+      inset 0 1px 0 rgba(255, 255, 255, 0.03) !important;
+  }
+
+  /*
+   * The inner <textarea> inherits `border border-input` from shadcn's base
+   * <Textarea /> component, which paints a thin white line between the input
+   * area and the footer row. Neutralize it inside InputGroups so the composer
+   * reads as one continuous surface.
+   */
+  [data-slot="input-group"] [data-slot="input-group-control"],
+  [data-slot="input-group"] [data-slot="input-group-addon"] {
+    border: 0 !important;
+    box-shadow: none !important;
+    outline: none !important;
+    background-color: transparent !important;
   }
 }

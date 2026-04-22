@@ -64,7 +64,6 @@ export async function POST(request: Request) {
   return Response.json({
     filename: storedUpload.filename,
     mediaType: storedUpload.contentType,
-    sizeBytes: storedUpload.sizeBytes,
     url: `r2://${storedUpload.key}`,
   });
 }

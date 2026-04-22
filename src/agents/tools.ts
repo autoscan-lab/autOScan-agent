@@ -6,6 +6,12 @@ import { z } from "zod";
 
 import type { UploadedAttachment } from "@/lib/message-converters";
 import {
+  findRawStudent,
+  studentsFromResult,
+  toStudentRow,
+  type StudentRow,
+} from "@/lib/grading";
+import {
   getStoredFileByKey,
   getLatestGradingSession,
   saveExportFile,
@@ -19,17 +25,6 @@ import { userStorageKey } from "@/lib/storage-keys";
 export type GradingContext = {
   attachments?: UploadedAttachment[];
   userId?: string;
-};
-
-type StudentRow = {
-  student_id: string;
-  status?: string;
-  grade?: number | null;
-  compile_ok?: boolean;
-  tests_passed?: string;
-  banned_count?: number;
-  notes?: string;
-  raw: Record<string, unknown>;
 };
 
 type AttachmentFile = {
@@ -49,13 +44,9 @@ const engineBaseUrl = () => {
   return url.replace(/\/$/, "");
 };
 
-const engineHeaders = (json = true) => {
+const engineHeaders = () => {
   const headers: Record<string, string> = {};
   const secret = process.env.ENGINE_SECRET?.trim();
-
-  if (json) {
-    headers["Content-Type"] = "application/json";
-  }
 
   if (secret) {
     headers.Authorization = `Bearer ${secret}`;
@@ -64,17 +55,6 @@ const engineHeaders = (json = true) => {
 
   return headers;
 };
-
-async function engineJson(path: string, body: object) {
-  const response = await fetch(`${engineBaseUrl()}${path}`, {
-    body: JSON.stringify(body),
-    headers: engineHeaders(true),
-    method: "POST",
-    signal: AbortSignal.timeout(60_000),
-  });
-
-  return parseEngineResponse(response);
-}
 
 async function parseEngineResponse(response: Response) {
   const contentType = response.headers.get("content-type") ?? "";
@@ -106,19 +86,10 @@ async function rememberSession(
   await saveGradingSession(contextUserId(userId), session);
 }
 
-function selectedAttachment(
-  argsAttachmentUrl: string | undefined,
-  contextAttachments: UploadedAttachment[] | undefined,
+function pickZipAttachment(
+  attachments: UploadedAttachment[] | undefined,
 ): UploadedAttachment | undefined {
-  if (argsAttachmentUrl) {
-    return {
-      filename: "submissions.zip",
-      mediaType: "application/zip",
-      url: argsAttachmentUrl,
-    };
-  }
-
-  const candidates = (contextAttachments ?? []).filter(
+  const candidates = (attachments ?? []).filter(
     (attachment) =>
       typeof attachment.url === "string" &&
       attachment.url.trim() !== "" &&
@@ -202,7 +173,7 @@ async function setupAssignment(assignmentName: string) {
   return fetch(
     `${engineBaseUrl()}/setup/${encodeURIComponent(assignmentName)}`,
     {
-      headers: engineHeaders(false),
+      headers: engineHeaders(),
       method: "POST",
       signal: AbortSignal.timeout(60_000),
     },
@@ -224,7 +195,7 @@ async function gradeWithCurrentEngine(
 
   const response = await fetch(`${engineBaseUrl()}/grade`, {
     body: formData,
-    headers: engineHeaders(false),
+    headers: engineHeaders(),
     method: "POST",
     signal: AbortSignal.timeout(60_000),
   });
@@ -232,60 +203,16 @@ async function gradeWithCurrentEngine(
   return parseEngineResponse(response);
 }
 
-function resultsFrom(session: StoredGradingSession | undefined) {
-  const results = session?.result.results;
-  return Array.isArray(results) ? results.filter(isRecord) : [];
+async function currentStudents(userId?: string): Promise<StudentRow[]> {
+  return studentsFromResult((await latestSession(userId))?.result);
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function numberFrom(value: unknown) {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function boolFrom(value: unknown) {
-  return typeof value === "boolean" ? value : undefined;
-}
-
-function stringFrom(value: unknown) {
-  return typeof value === "string" ? value : undefined;
-}
-
-function testsPassed(value: unknown) {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-
-  const passed = numberFrom(value.passed);
-  const total = numberFrom(value.total);
-  if (passed === null || total === null) {
-    return undefined;
-  }
-
-  return `${passed}/${total}`;
-}
-
-function toStudentRow(result: Record<string, unknown>): StudentRow {
-  const studentId =
-    stringFrom(result.student_id) ?? stringFrom(result.id) ?? "unknown";
-  const grade = numberFrom(result.manual_grade) ?? numberFrom(result.grade);
-
-  return {
-    banned_count: numberFrom(result.banned_count) ?? undefined,
-    compile_ok: boolFrom(result.compile_ok),
-    grade,
-    notes: stringFrom(result.manual_reason) ?? stringFrom(result.notes),
-    raw: result,
-    status: stringFrom(result.status),
-    student_id: studentId,
-    tests_passed: testsPassed(result.tests),
-  };
-}
-
-async function currentStudents(userId?: string) {
-  return resultsFrom(await latestSession(userId)).map(toStudentRow);
+/** Drop fields that serialize to null so tool outputs stay lean for the LLM. */
+function prune(row: StudentRow) {
+  const entries = Object.entries(row).filter(
+    ([key, value]) => value !== null && key !== "sourceText",
+  );
+  return Object.fromEntries(entries) as Partial<Omit<StudentRow, "sourceText">>;
 }
 
 async function buildGradesWorkbook(
@@ -298,12 +225,12 @@ async function buildGradesWorkbook(
 
   const worksheet = workbook.addWorksheet("Grades");
   worksheet.columns = [
-    { header: "Student ID", key: "student_id", width: 24 },
+    { header: "Student ID", key: "studentId", width: 24 },
     { header: "Status", key: "status", width: 16 },
     { header: "Grade", key: "grade", width: 12 },
-    { header: "Compile OK", key: "compile_ok", width: 14 },
-    { header: "Tests Passed", key: "tests_passed", width: 16 },
-    { header: "Banned Count", key: "banned_count", width: 16 },
+    { header: "Compile OK", key: "compileOk", width: 14 },
+    { header: "Tests Passed", key: "testsPassed", width: 16 },
+    { header: "Banned Count", key: "bannedCount", width: 16 },
     { header: "Notes", key: "notes", width: 42 },
   ];
 
@@ -312,14 +239,14 @@ async function buildGradesWorkbook(
 
   for (const student of students) {
     worksheet.addRow({
-      banned_count: student.banned_count ?? "",
-      compile_ok:
-        typeof student.compile_ok === "boolean" ? student.compile_ok : "",
+      bannedCount: student.bannedCount ?? "",
+      compileOk:
+        typeof student.compileOk === "boolean" ? student.compileOk : "",
       grade: student.grade ?? "",
       notes: student.notes ?? "",
       status: student.status ?? "",
-      student_id: student.student_id,
-      tests_passed: student.tests_passed ?? "",
+      studentId: student.studentId,
+      testsPassed: student.testsPassed ?? "",
     });
   }
 
@@ -338,26 +265,19 @@ async function buildGradesWorkbook(
 export const gradeSubmissions = tool<
   z.ZodObject<{
     assignment_name: z.ZodString;
-    attachment_url: z.ZodOptional<z.ZodString>;
   }>,
   GradingContext
 >({
-  description: "Grade student submissions from an uploaded zip file.",
+  description:
+    "Grade student submissions from the zip file the user attached to this chat.",
   name: "grade_submissions",
   parameters: z.object({
     assignment_name: z
       .string()
       .describe("The assignment name, for example S0."),
-    attachment_url: z
-      .string()
-      .optional()
-      .describe("Optional hosted URL or data URL for the submitted zip file."),
   }),
-  execute: async ({ assignment_name, attachment_url }, runContext) => {
-    const attachment = selectedAttachment(
-      attachment_url,
-      runContext?.context.attachments,
-    );
+  execute: async ({ assignment_name }, runContext) => {
+    const attachment = pickZipAttachment(runContext?.context.attachments);
 
     if (!attachment) {
       return {
@@ -388,7 +308,12 @@ export const gradeSubmissions = tool<
       uploads: [upload],
     });
 
-    return result;
+    const students = studentsFromResult(result);
+    return {
+      assignmentName: assignment_name,
+      studentCount: students.length,
+      students: students.map(prune),
+    };
   },
   timeoutBehavior: "error_as_result",
   timeoutMs: 240_000,
@@ -411,7 +336,7 @@ export const listStudents = tool<
       };
     }
 
-    return { students };
+    return { students: students.map(prune) };
   },
 });
 
@@ -425,7 +350,7 @@ export const showStudent = tool<
   parameters: z.object({ student_id: z.string() }),
   execute: async ({ student_id }, runContext) => {
     const students = await currentStudents(runContext?.context.userId);
-    const student = students.find((row) => row.student_id === student_id);
+    const student = students.find((row) => row.studentId === student_id);
 
     if (!student) {
       return {
@@ -433,7 +358,7 @@ export const showStudent = tool<
       };
     }
 
-    return student.raw;
+    return student;
   },
 });
 
@@ -456,26 +381,22 @@ export const bumpGrade = tool<
   execute: async ({ student_id, new_grade, reason }, runContext) => {
     const userId = contextUserId(runContext?.context.userId);
     const session = await latestSession(userId);
-    const results = resultsFrom(session);
-    const student = results.find(
-      (result) =>
-        (stringFrom(result.student_id) ?? stringFrom(result.id)) === student_id,
-    );
+    const rawStudent = findRawStudent(session, student_id);
 
-    if (!session || !student) {
+    if (!session || !rawStudent) {
       return {
         message: `Student '${student_id}' was not found in the latest run.`,
       };
     }
 
-    student.manual_grade = new_grade;
-    student.manual_reason = reason;
+    rawStudent.manual_grade = new_grade;
+    rawStudent.manual_reason = reason;
     session.updatedAt = new Date().toISOString();
     await rememberSession(userId, session);
 
     return {
-      message: "Grade adjusted and saved to durable storage.",
-      student: toStudentRow(student),
+      message: "Grade adjusted and saved.",
+      student: prune(toStudentRow(rawStudent)),
     };
   },
 });
@@ -512,13 +433,8 @@ export const exportGrades = tool<
     });
 
     return {
-      download_url: `/api/exports/${metadata.id}`,
-      expires_in: "Stored in R2 until removed.",
+      downloadUrl: `/api/exports/${metadata.id}`,
       filename: metadata.filename,
     };
   },
 });
-
-export async function callFutureEngineEndpoint(path: string, body: object) {
-  return engineJson(path, body);
-}

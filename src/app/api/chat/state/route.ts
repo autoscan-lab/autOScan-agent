@@ -2,6 +2,7 @@ import type { UIMessage } from "ai";
 
 import { auth } from "@/auth";
 import { clearChatState, getChatState, saveChatState } from "@/lib/chat-state";
+import { clearLatestGradingSession } from "@/lib/r2-storage";
 
 export const runtime = "nodejs";
 
@@ -70,5 +71,10 @@ export async function DELETE() {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  return Response.json(await clearChatState(sessionUserId(session)));
+  const userId = sessionUserId(session);
+  const [cleared] = await Promise.all([
+    clearChatState(userId),
+    clearLatestGradingSession(userId).catch(() => undefined),
+  ]);
+  return Response.json(cleared);
 }

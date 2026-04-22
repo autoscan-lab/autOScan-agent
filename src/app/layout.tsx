@@ -27,7 +27,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html className={`${inter.variable} ${geistMono.variable} h-full antialiased`} lang="en">
+    <html
+      className={`dark ${inter.variable} ${geistMono.variable} h-full antialiased`}
+      lang="en"
+    >
       <body className="min-h-full bg-background text-foreground">
         <TooltipProvider>{children}</TooltipProvider>
       </body>
