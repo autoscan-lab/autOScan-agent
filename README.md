@@ -20,6 +20,14 @@ Chat history is saved in MongoDB, and uploaded files plus grading run metadata a
 
 ---
 
+## SDK Architecture
+
+- **AI SDK** (`ai`, `@ai-sdk/react`) handles chat UX and streaming message transport.
+- **OpenAI Agents SDK** (`@openai/agents`) handles agent orchestration, instructions, tool calling, and run lifecycle.
+- The bridge is provided by `@openai/agents-extensions` (`ai-sdk`, `ai-sdk-ui`) so agent runs stream into AI SDK UI messages.
+
+---
+
 ## Features
 
 - Single tool surface for grading: `grade_submissions(assignment_name)`

@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   description:
-    "Google-authenticated autOScan grading chat powered by the OpenAI Agents SDK and Groq.",
+    "Grading Agent powered by the OpenAI SDK and Groq.",
   title: "autOScan Agent",
 };
 
