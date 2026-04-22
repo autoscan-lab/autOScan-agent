@@ -66,8 +66,8 @@ export async function POST(req: Request) {
       error,
       providerDetail,
     });
-    const message =
-      error instanceof Error ? error.message : "Unexpected chat error.";
-    return new Response(message, { status: 500 });
+    return new Response("Chat request failed. Please try again.", {
+      status: 500,
+    });
   }
 }

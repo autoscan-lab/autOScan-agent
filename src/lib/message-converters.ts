@@ -1,4 +1,4 @@
-import { assistant, system, user, type AgentInputItem } from "@openai/agents";
+import { assistant, user, type AgentInputItem } from "@openai/agents";
 import type { FileUIPart, UIMessage } from "ai";
 
 export type UploadedAttachment = {
@@ -61,15 +61,17 @@ export function toAgentInput(messages: UiMessageWithLegacyContent[]): AgentInput
   const input: AgentInputItem[] = [];
 
   for (const message of messages) {
+    // Never trust client-supplied system messages.
+    if (message.role === "system") {
+      continue;
+    }
+
     const text = `${extractUiMessageText(message)}${describeFiles(message)}`.trim();
     if (!text) {
       continue;
     }
 
     switch (message.role) {
-      case "system":
-        input.push(system(text));
-        break;
       case "assistant":
         input.push(assistant(text));
         break;
