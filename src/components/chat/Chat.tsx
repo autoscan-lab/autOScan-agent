@@ -173,7 +173,6 @@ export function Chat({
       error={panelError}
       loading={panelLoading}
       selectedStudentId={selectedStudentId}
-      setSelectedStudentId={setSelectedStudentId}
     />
   );
 
@@ -288,19 +287,33 @@ export function Chat({
         className="relative z-10 flex min-h-0 flex-1 overflow-hidden"
         style={
           {
-            "--inspector-w": "min(28rem, 40vw)",
+            "--inspector-w": "min(36rem, 46vw)",
           } as React.CSSProperties
         }
       >
         <section
           className={cn(
-            "relative flex min-w-0 flex-1 flex-col transition-[margin-right] duration-[360ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+            "relative flex min-w-0 flex-1 flex-col transition-[margin-right,padding-right] duration-[360ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
             panelOpen ? "md:mr-[var(--inspector-w)]" : "md:mr-0",
           )}
+          style={{
+            paddingRight: panelOpen
+              ? "0px"
+              : "max(calc((100vw - 48rem) / 2 - 2rem), 0px)",
+          }}
         >
           <Conversation className="relative z-10 flex-1">
-            <ConversationContent className="mx-auto w-full max-w-3xl gap-6 px-3 pb-48 pt-6 md:px-6">
-              <ChatMessages messages={messageList} />
+            <ConversationContent
+              className="mx-auto w-full max-w-3xl gap-6 px-3 pb-48 pt-6 md:mx-0 md:ml-auto md:mr-8 md:px-6"
+            >
+              <ChatMessages
+                messages={messageList}
+                onSelectStudent={(studentId) => {
+                  setSelectedStudentId(studentId);
+                  setPanelOpen(true);
+                }}
+                selectedStudentId={selectedStudentId}
+              />
 
               {runtimeError ? (
                 <div className="rounded-md border border-[var(--linear-accent)]/35 bg-[var(--linear-accent)]/10 px-3 py-2 text-sm text-[var(--linear-accent-hover)]">
@@ -317,9 +330,16 @@ export function Chat({
             <ConversationScrollButton />
           </Conversation>
 
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-10 transition-[padding-right] duration-[360ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+            style={{
+              paddingRight: panelOpen
+                ? "0px"
+                : "max(calc((100vw - 48rem) / 2 - 2rem), 0px)",
+            }}
+          >
             <div className="px-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6 md:pb-5">
-              <div className="pointer-events-auto mx-auto w-full max-w-3xl">
+              <div className="pointer-events-auto mx-auto w-full max-w-3xl md:mx-0 md:ml-auto md:mr-8">
                 {attachmentError ? (
                   <p className="mb-2 text-xs text-[var(--linear-danger)]">
                     {attachmentError}
@@ -342,7 +362,7 @@ export function Chat({
         <aside
           aria-hidden={!panelOpen}
           className={cn(
-            "pointer-events-none absolute inset-y-0 right-0 hidden w-[var(--inspector-w)] max-w-[520px] p-3 pl-0 transition-transform duration-[360ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none md:block",
+            "pointer-events-none absolute inset-y-0 right-0 hidden w-[var(--inspector-w)] max-w-[680px] p-2 pl-0 transition-transform duration-[360ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none md:block",
             panelOpen
               ? "translate-x-0"
               : "translate-x-[calc(100%+0.25rem)]",

@@ -5,22 +5,76 @@ import { useMemo } from "react";
 
 import { cn } from "@/lib/utils";
 import { formatStudentName, gradeTone, statusTone } from "./display";
-import type { GradingRunResponse } from "./types";
+import type { GradingRunResponse, StudentInspectorRow } from "./types";
 
 export type InspectorPanelProps = {
   data: GradingRunResponse | null;
   error: string | null;
   loading: boolean;
   selectedStudentId: string | null;
-  setSelectedStudentId: (id: string | null) => void;
 };
+
+type Metric = {
+  label: string;
+  tone: string;
+  value: string;
+};
+
+function gradeLabel(student: StudentInspectorRow) {
+  return student.grade === null ? "-" : String(student.grade);
+}
+
+function metricsFor(student: StudentInspectorRow): Metric[] {
+  return [
+    {
+      label: "Compile",
+      value:
+        student.compileOk === null
+          ? "not reported"
+          : student.compileOk
+            ? "passes"
+            : "fails",
+      tone:
+        student.compileOk === true
+          ? "text-[var(--linear-success)]"
+          : student.compileOk === false
+            ? "text-[var(--linear-danger)]"
+            : "text-[var(--chat-text-muted)]",
+    },
+    {
+      label: "Tests",
+      value: student.testsPassed ?? "not reported",
+      tone: "text-[var(--foreground)]",
+    },
+    {
+      label: "Banned",
+      value:
+        student.bannedCount === null
+          ? "not reported"
+          : student.bannedCount === 0
+            ? "none"
+            : String(student.bannedCount),
+      tone:
+        student.bannedCount && student.bannedCount > 0
+          ? "text-[var(--linear-danger)]"
+          : "text-[var(--foreground)]",
+    },
+  ];
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="font-mono text-[11px] uppercase tracking-[0.04em] text-[var(--chat-text-muted)]">
+      {children}
+    </p>
+  );
+}
 
 export function InspectorPanel({
   data,
   error,
   loading,
   selectedStudentId,
-  setSelectedStudentId,
 }: InspectorPanelProps) {
   const students = useMemo(() => data?.students ?? [], [data?.students]);
   const selectedStudent = useMemo(() => {
@@ -37,29 +91,8 @@ export function InspectorPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {hasStudents ? (
-        <div className="flex items-center justify-between gap-3 border-b border-[var(--linear-border-subtle)] px-4 py-3">
-          <div className="min-w-0">
-            <p className="font-mono text-[11px] uppercase tracking-[0.04em] text-[var(--chat-text-muted)]">
-              Inspector
-            </p>
-            {data?.assignmentName ? (
-              <p className="mt-0.5 truncate text-[15px] font-[510] leading-tight text-[var(--foreground)]">
-                {data.assignmentName}
-              </p>
-            ) : null}
-          </div>
-          <span className="shrink-0 font-mono text-[11px] text-[var(--chat-text-muted)]">
-            <span className="font-[510] text-[var(--chat-text-secondary)]">
-              {students.length}
-            </span>{" "}
-            student{students.length === 1 ? "" : "s"}
-          </span>
-        </div>
-      ) : null}
-
       {error ? (
-        <div className="mx-4 mt-4 rounded-md border border-[var(--linear-danger)]/35 bg-[var(--linear-danger)]/10 px-3 py-2 text-sm text-[var(--linear-danger)]">
+        <div className="mx-6 mt-5 rounded-md border border-[var(--linear-danger)]/35 bg-[var(--linear-danger)]/10 px-3 py-2 text-sm text-[var(--linear-danger)]">
           {error}
         </div>
       ) : null}
@@ -73,185 +106,84 @@ export function InspectorPanel({
         <div className="flex flex-1 items-center justify-center px-6 text-center text-[13px] text-[var(--chat-text-muted)]">
           No grading results yet
         </div>
-      ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-[13rem,1fr]">
-          <div className="min-h-0 overflow-y-auto border-r border-[var(--linear-border-subtle)] py-1">
-            {students.map((student) => {
-              const active = selectedStudent?.studentId === student.studentId;
-              return (
-                <button
-                  className={cn(
-                    "relative flex w-full flex-col gap-1 px-3 py-2.5 text-left transition-colors hover:bg-[var(--linear-ghost)]",
-                    active && "bg-[var(--linear-ghost)]",
-                  )}
-                  key={student.studentId}
-                  onClick={() => setSelectedStudentId(student.studentId)}
-                  type="button"
-                >
-                  {active ? (
-                    <span
-                      aria-hidden
-                      className="absolute inset-y-1 left-0 w-[2px] rounded-full bg-[var(--linear-accent)]"
-                    />
-                  ) : null}
-                  <div className="font-mono text-[12px] text-[var(--foreground)]">
-                    {formatStudentName(student.studentId)}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span
-                      className={cn(
-                        "rounded-full border px-1.5 py-0.5 text-[10px] font-[510] leading-none",
-                        statusTone(student.status),
-                      )}
-                    >
-                      {student.status ?? "-"}
-                    </span>
-                    <span
-                      className={cn(
-                        "rounded-full border px-1.5 py-0.5 text-[10px] font-[510] leading-none tabular-nums",
-                        gradeTone(student.grade),
-                      )}
-                    >
-                      {student.grade === null ? "-" : student.grade}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="min-h-0 overflow-y-auto p-4">
-            {selectedStudent ? (
-              <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-mono text-[11px] uppercase tracking-[0.04em] text-[var(--chat-text-muted)]">
-                      Student
-                    </p>
-                    <p className="mt-1 truncate font-mono text-[18px] font-[510] text-[var(--foreground)]">
+      ) : selectedStudent ? (
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+          <div className="space-y-6">
+            <section>
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <SectionLabel>Student</SectionLabel>
+                  <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
+                    <p className="truncate font-mono text-[28px] font-[510] tracking-[-0.04em] text-[var(--foreground)]">
                       {formatStudentName(selectedStudent.studentId)}
                     </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-mono text-[11px] uppercase tracking-[0.04em] text-[var(--chat-text-muted)]">
-                      Grade
-                    </p>
-                    <p
+                    <span
                       className={cn(
-                        "mt-0.5 font-heading text-[36px] font-[510] leading-none tracking-[-0.04em] tabular-nums",
-                        selectedStudent.grade === null
-                          ? "text-[var(--chat-text-muted)]"
-                          : selectedStudent.grade >= 90
-                            ? "text-[var(--linear-success)]"
-                            : selectedStudent.grade >= 70
-                              ? "text-[var(--foreground)]"
-                              : "text-[var(--linear-danger)]",
+                        "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-[510]",
+                        statusTone(selectedStudent.status),
                       )}
                     >
-                      {selectedStudent.grade === null ? "-" : selectedStudent.grade}
-                    </p>
+                      <span className="size-1.5 rounded-full bg-current" />
+                      {selectedStudent.status ?? "unknown"}
+                    </span>
                   </div>
                 </div>
 
-                <div>
-                  <span
+                <div className="shrink-0 text-right">
+                  <SectionLabel>Grade</SectionLabel>
+                  <p
                     className={cn(
-                      "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-[510]",
-                      statusTone(selectedStudent.status),
+                      "mt-1 font-heading text-[46px] font-[510] leading-none tracking-[-0.06em] tabular-nums",
+                      gradeTone(selectedStudent.grade),
                     )}
                   >
-                    <span className="size-1.5 rounded-full bg-current" />
-                    {selectedStudent.status ?? "unknown"}
-                  </span>
+                    {gradeLabel(selectedStudent)}
+                  </p>
                 </div>
-
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    {
-                      label: "Compile",
-                      value:
-                        selectedStudent.compileOk === null
-                          ? "-"
-                          : selectedStudent.compileOk
-                            ? "passes"
-                            : "fails",
-                      tone:
-                        selectedStudent.compileOk === true
-                          ? "text-[var(--linear-success)]"
-                          : selectedStudent.compileOk === false
-                            ? "text-[var(--linear-danger)]"
-                            : "text-[var(--chat-text-muted)]",
-                    },
-                    {
-                      label: "Tests",
-                      value: selectedStudent.testsPassed ?? "-",
-                      tone: "text-[var(--foreground)]",
-                    },
-                    {
-                      label: "Banned",
-                      value:
-                        selectedStudent.bannedCount === null
-                          ? "-"
-                          : selectedStudent.bannedCount === 0
-                            ? "none"
-                            : String(selectedStudent.bannedCount),
-                      tone:
-                        selectedStudent.bannedCount &&
-                        selectedStudent.bannedCount > 0
-                          ? "text-[var(--linear-danger)]"
-                          : "text-[var(--foreground)]",
-                    },
-                  ].map((metric) => (
-                    <div
-                      className="rounded-md border border-[var(--linear-border-subtle)] bg-[var(--linear-ghost)] px-2.5 py-2"
-                      key={metric.label}
-                    >
-                      <p className="font-mono text-[10px] uppercase tracking-[0.04em] text-[var(--chat-text-muted)]">
-                        {metric.label}
-                      </p>
-                      <p
-                        className={cn(
-                          "mt-1 truncate text-[13px] font-[510] tabular-nums",
-                          metric.tone,
-                        )}
-                      >
-                        {metric.value}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-
-                {selectedStudent.notes ? (
-                  <div className="rounded-md border border-[var(--linear-border-subtle)] bg-[var(--linear-ghost)] p-3">
-                    <p className="font-mono text-[11px] uppercase tracking-[0.04em] text-[var(--chat-text-muted)]">
-                      Notes
-                    </p>
-                    <p className="mt-1.5 whitespace-pre-wrap text-[13px] leading-relaxed text-[var(--chat-text-secondary)]">
-                      {selectedStudent.notes}
-                    </p>
-                  </div>
-                ) : null}
-
-                {selectedStudent.sourceText ? (
-                  <details className="group rounded-md border border-[var(--linear-border-subtle)] bg-[var(--linear-ghost)]">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-[12px] font-[510] text-[var(--chat-text-secondary)] hover:text-[var(--foreground)]">
-                      <span className="font-mono uppercase tracking-[0.04em] text-[var(--chat-text-muted)]">
-                        Submitted source
-                      </span>
-                      <span className="text-[11px] text-[var(--chat-text-muted)] transition group-open:rotate-180">
-                        v
-                      </span>
-                    </summary>
-                    <pre className="max-h-80 overflow-auto border-t border-[var(--linear-border-subtle)] bg-[var(--linear-panel)] p-3 font-mono text-[12px] leading-[1.55] text-[var(--foreground)]">
-                      {selectedStudent.sourceText}
-                    </pre>
-                  </details>
-                ) : null}
               </div>
+            </section>
+
+            <section className="-mx-6 grid grid-cols-3 divide-x divide-[var(--linear-border-subtle)] border-y border-[var(--linear-border-subtle)] px-6 py-5">
+              {metricsFor(selectedStudent).map((metric, index) => (
+                <div className={cn(index > 0 && "pl-4", index < 2 && "pr-4")} key={metric.label}>
+                  <SectionLabel>{metric.label}</SectionLabel>
+                  <p
+                    className={cn(
+                      "mt-1 truncate text-[15px] font-[510] tabular-nums",
+                      metric.tone,
+                    )}
+                  >
+                    {metric.value}
+                  </p>
+                </div>
+              ))}
+            </section>
+
+            {selectedStudent.notes ? (
+              <section className="-mx-6 border-b border-[var(--linear-border-subtle)] px-6 pb-5">
+                <SectionLabel>Notes</SectionLabel>
+                <p className="mt-2 whitespace-pre-wrap text-[13px] leading-relaxed text-[var(--chat-text-secondary)]">
+                  {selectedStudent.notes}
+                </p>
+              </section>
+            ) : null}
+
+            {selectedStudent.sourceText ? (
+              <details className="group -mx-6 border-t border-[var(--linear-border-subtle)] px-6 pt-5">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-[12px] font-[510] text-[var(--chat-text-secondary)] hover:text-[var(--foreground)]">
+                  <SectionLabel>Submitted source</SectionLabel>
+                  <span className="text-[11px] text-[var(--chat-text-muted)] transition group-open:rotate-180">
+                    v
+                  </span>
+                </summary>
+                <pre className="mt-3 max-h-80 overflow-auto rounded-md border border-[var(--linear-border-subtle)] bg-[var(--linear-panel)] p-3 font-mono text-[12px] leading-[1.55] text-[var(--foreground)]">
+                  {selectedStudent.sourceText}
+                </pre>
+              </details>
             ) : null}
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

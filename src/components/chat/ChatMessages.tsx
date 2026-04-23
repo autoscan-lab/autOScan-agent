@@ -43,6 +43,18 @@ type ToolSummary = {
   chips: string[];
 };
 
+type ChatMessagesProps = {
+  messages: UIMessage[];
+  onSelectStudent?: (studentId: string) => void;
+  selectedStudentId?: string | null;
+};
+
+type GradingResultRow = {
+  grade: string;
+  status: string;
+  studentId: string;
+};
+
 function extractThoughtSteps(message: UIMessage): ThoughtStep[] {
   return message.parts.flatMap((part): ThoughtStep[] => {
     if (isReasoningUIPart(part)) {
@@ -256,7 +268,105 @@ function FileChip({ part }: { part: FileUIPart }) {
   );
 }
 
-export function ChatMessages({ messages }: { messages: UIMessage[] }) {
+function extractGradingRows(part: ToolPart): GradingResultRow[] {
+  if (!("output" in part) || !part.output || typeof part.output !== "object") {
+    return [];
+  }
+  const students = (part.output as Record<string, unknown>).students;
+  if (!Array.isArray(students)) {
+    return [];
+  }
+
+  return students.flatMap((entry): GradingResultRow[] => {
+    if (!entry || typeof entry !== "object") {
+      return [];
+    }
+    const row = entry as Record<string, unknown>;
+    const studentId = typeof row.studentId === "string" ? row.studentId : "";
+    if (!studentId) {
+      return [];
+    }
+    return [
+      {
+        grade: typeof row.grade === "number" ? String(row.grade) : "-",
+        status: typeof row.status === "string" ? row.status : "-",
+        studentId,
+      },
+    ];
+  });
+}
+
+const gradingColumnTemplate = "minmax(10rem,1.6fr) minmax(6rem,1fr) minmax(6rem,1fr)";
+
+function GradingResultsTable({
+  onSelectStudent,
+  part,
+  selectedStudentId,
+}: {
+  onSelectStudent?: (studentId: string) => void;
+  part: ToolPart;
+  selectedStudentId?: string | null;
+}) {
+  const rows = useMemo(() => extractGradingRows(part), [part]);
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="my-4 overflow-x-auto rounded-xl border border-border bg-card/40">
+      <div className="min-w-full">
+        <div
+          className="grid border-b border-border bg-muted/70 text-sm"
+          style={{ gridTemplateColumns: gradingColumnTemplate }}
+        >
+          {["studentId", "status", "grade"].map((header) => (
+            <div
+              className="px-4 py-2.5 text-left font-semibold text-foreground"
+              key={header}
+            >
+              {header}
+            </div>
+          ))}
+        </div>
+
+        <div>
+          {rows.map((row) => {
+            const active = row.studentId === selectedStudentId;
+            return (
+              <button
+                aria-pressed={active}
+                className={cn(
+                  "grid w-full min-w-full border-b border-border text-left text-sm transition-colors last:border-b-0 hover:bg-muted/25 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--linear-accent)]",
+                  active && "bg-[var(--linear-accent)]/10",
+                )}
+                key={row.studentId}
+                onClick={() => onSelectStudent?.(row.studentId)}
+                style={{ gridTemplateColumns: gradingColumnTemplate }}
+                type="button"
+              >
+                <span className="min-w-0 px-4 py-2.5 align-top text-foreground">
+                  {row.studentId}
+                </span>
+                <span className="min-w-0 px-4 py-2.5 align-top text-[var(--chat-text-secondary)]">
+                  {row.status}
+                </span>
+                <span className="min-w-0 px-4 py-2.5 align-top text-[var(--chat-text-secondary)]">
+                  {row.grade}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ChatMessages({
+  messages,
+  onSelectStudent,
+  selectedStudentId,
+}: ChatMessagesProps) {
   if (messages.length === 0) {
     return (
       <ConversationEmptyState className="gap-3 pt-32">
@@ -297,6 +407,21 @@ export function ChatMessages({ messages }: { messages: UIMessage[] }) {
 
             if (part.type === "file") {
               return <FileChip key={key} part={part} />;
+            }
+
+            if (
+              isToolUIPart(part) &&
+              toolNameOf(part) === "grade_submissions" &&
+              part.state === "output-available"
+            ) {
+              return (
+                <GradingResultsTable
+                  key={key}
+                  onSelectStudent={onSelectStudent}
+                  part={part}
+                  selectedStudentId={selectedStudentId}
+                />
+              );
             }
 
             return null;

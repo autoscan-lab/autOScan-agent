@@ -9,8 +9,7 @@ import {
 } from "./tools";
 
 /**
- * Groq can return `Failed to call a function` / `failed_generation` when tool
- * argument generation drifts. Keep tool calls deterministic and serialized.
+ * Keep tool calls deterministic and serialized.
  */
 const groqModelSettings: ModelSettings = {
   temperature: 0.2,
@@ -39,7 +38,7 @@ Tool-use rules — follow strictly:
 - Never call a tool just to double-check a result you already received.
 
 Response style:
-- After grading, summarize the run in 1-2 sentences and format students as a compact markdown table (studentId, status, grade).
+- After grading, reply with a single short sentence confirming the run (for example: "Graded 3 submissions for S0."). The UI renders the results table itself, so do not include a markdown table or per-student details.
 - Keep responses direct and practical.`;
 
 export const createGradingAgent = (options?: {
