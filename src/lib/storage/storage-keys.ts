@@ -33,7 +33,6 @@ export function buildRunKeys(input: RunKeyInput) {
   const uploadFilename = safeObjectFilename(input.uploadFilename, "submissions.zip");
 
   return {
-    latestKey: `${prefix}/users/${userKey}/latest.json`,
     runKey: `${prefix}/runs/${userKey}/${input.runId}.json`,
     uploadKey: `${prefix}/uploads/${userKey}/${input.runId}/${uploadFilename}`,
     userKey,

@@ -1,14 +1,17 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
-import { SignInHero } from "@/components/SignInHero";
 
-export default async function AccessDeniedPage() {
+export default async function AuthLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   const session = await auth();
 
   if (session?.user) {
     redirect("/");
   }
 
-  return <SignInHero mode="denied" />;
+  return children;
 }

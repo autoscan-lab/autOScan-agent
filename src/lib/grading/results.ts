@@ -1,4 +1,4 @@
-import type { EngineResult, StoredGradingSession } from "@/lib/r2-storage";
+import type { EngineResult, StoredGradingSession } from "@/lib/storage";
 
 /**
  * Canonical shape the UI + tool outputs agree on. The engine returns a loose
@@ -15,7 +15,7 @@ export type StudentRow = {
   sourceText: string | null;
 };
 
-export type LatestGrading = {
+export type GradingRunSummary = {
   assignmentName: string | null;
   students: StudentRow[];
 };
@@ -70,9 +70,9 @@ export function studentsFromResult(result: EngineResult | undefined): StudentRow
   return rows.filter(isRecord).map(toStudentRow);
 }
 
-export function latestFromSession(
+export function gradingRunFromSession(
   session: StoredGradingSession | undefined,
-): LatestGrading {
+): GradingRunSummary {
   if (!session) {
     return { assignmentName: null, students: [] };
   }

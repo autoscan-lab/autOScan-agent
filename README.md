@@ -34,7 +34,7 @@ Chat history is saved in MongoDB, and uploaded files plus grading run metadata a
 - Grading from attached zip files in chat
 - Compact markdown results table (`studentId`, `status`, `grade`)
 - Durable chat id + messages in MongoDB (sessions survive reloads)
-- Run artifacts in R2 (uploads + latest run pointer per user)
+- Run artifacts in R2 (uploads + run metadata addressable by run id)
 
 ---
 
@@ -77,10 +77,7 @@ With `R2_APP_PREFIX` (default `web`):
 ```text
 web/uploads/<user-hash>/<run-id>/<file>.zip
 web/runs/<user-hash>/<run-id>.json
-web/users/<user-hash>/latest.json
 ```
-
-`latest.json` is a pointer to the newest run id for that user.
 
 ---
 

@@ -25,7 +25,11 @@ function isFilePart(part: UIMessage["parts"][number]): part is FileUIPart {
 }
 
 export function extractUiMessageText(message: UiMessageWithLegacyContent) {
-  const text = message.parts?.filter(isTextPart).map((part) => part.text).join("") ?? "";
+  const text =
+    message.parts
+      ?.filter(isTextPart)
+      .map((part) => part.text)
+      .join("") ?? "";
 
   if (text) {
     return text;
@@ -47,17 +51,25 @@ function describeFiles(message: UIMessage) {
   return `\n\nAttached files available to tools: ${names}.`;
 }
 
-export function extractAttachments(messages: UIMessage[]): UploadedAttachment[] {
-  return messages.flatMap((message) =>
-    (message.parts ?? []).filter(isFilePart).map((part) => ({
+export function extractLatestUserAttachments(
+  messages: UIMessage[],
+): UploadedAttachment[] {
+  const latestUserMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === "user");
+
+  return (
+    latestUserMessage?.parts.filter(isFilePart).map((part) => ({
       filename: part.filename,
       mediaType: part.mediaType,
       url: part.url,
-    }))
+    })) ?? []
   );
 }
 
-export function toAgentInput(messages: UiMessageWithLegacyContent[]): AgentInputItem[] {
+export function toAgentInput(
+  messages: UiMessageWithLegacyContent[],
+): AgentInputItem[] {
   const input: AgentInputItem[] = [];
 
   for (const message of messages) {
@@ -66,7 +78,8 @@ export function toAgentInput(messages: UiMessageWithLegacyContent[]): AgentInput
       continue;
     }
 
-    const text = `${extractUiMessageText(message)}${describeFiles(message)}`.trim();
+    const text =
+      `${extractUiMessageText(message)}${describeFiles(message)}`.trim();
     if (!text) {
       continue;
     }

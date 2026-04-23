@@ -1,23 +1,13 @@
 import { randomUUID } from "node:crypto";
 
 import { auth } from "@/auth";
-import { saveUploadedFile } from "@/lib/r2-storage";
+import { saveUploadedFile } from "@/lib/storage";
+import { resolveSessionUserId } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const maxZipBytes = 12 * 1024 * 1024;
-
-type AuthSessionLike = {
-  user?: {
-    email?: string | null;
-    name?: string | null;
-  };
-} | null;
-
-function sessionUserId(session: AuthSessionLike) {
-  return session?.user?.email ?? session?.user?.name ?? "unknown-user";
-}
 
 function isZipUpload(file: File) {
   const filename = file.name.toLowerCase();
@@ -51,7 +41,7 @@ export async function POST(request: Request) {
     return new Response("Zip file is too large (max 12 MB).", { status: 400 });
   }
 
-  const userId = sessionUserId(session);
+  const userId = resolveSessionUserId(session);
   const bytes = Buffer.from(await uploaded.arrayBuffer());
   const storedUpload = await saveUploadedFile({
     bytes,

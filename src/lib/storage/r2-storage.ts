@@ -6,7 +6,7 @@ import {
   type GetObjectCommandOutput,
 } from "@aws-sdk/client-s3";
 
-import { buildRunKeys, safeObjectFilename } from "@/lib/storage-keys";
+import { buildRunKeys, safeObjectFilename } from "./storage-keys";
 
 export type EngineResult = Record<string, unknown>;
 
@@ -182,46 +182,21 @@ export async function saveGradingSession(
   });
 
   await putJson(keys.runKey, session);
-  await putJson(keys.latestKey, {
-    runId: session.id,
-    updatedAt: session.updatedAt,
-  });
 }
 
-export async function getLatestGradingSession(userId: string) {
-  const pointerKeys = buildRunKeys({
-    runId: "latest",
-    uploadFilename: "submissions.zip",
-    userId,
-  });
-  const pointer = await getJson<{ runId: string }>(pointerKeys.latestKey);
-
-  if (!pointer?.runId) {
+export async function getGradingSession(userId: string, runId: string) {
+  const normalizedRunId = runId.trim();
+  if (!normalizedRunId) {
     return undefined;
   }
 
   const runKeys = buildRunKeys({
-    runId: pointer.runId,
+    runId: normalizedRunId,
     uploadFilename: "submissions.zip",
     userId,
   });
 
   return getJson<StoredGradingSession>(runKeys.runKey);
-}
-
-/**
- * Clear the "latest run" pointer for a user. We intentionally keep individual
- * run/upload objects around (they are addressable by id) — this just hides
- * them from the inspector so a reset chat does not surface stale results.
- */
-export async function clearLatestGradingSession(userId: string) {
-  const keys = buildRunKeys({
-    runId: "latest",
-    uploadFilename: "submissions.zip",
-    userId,
-  });
-
-  await putJson(keys.latestKey, { runId: "", updatedAt: new Date().toISOString() });
 }
 
 export async function getStoredFileByKey(key: string) {

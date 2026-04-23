@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 
-import FaultyTerminal from "@/components/FaultyTerminal";
+import FaultyTerminal from "@/components/landing/FaultyTerminal";
 
 type SignInHeroProps = {
   mode?: "sign-in" | "denied";

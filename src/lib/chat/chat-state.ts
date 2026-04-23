@@ -3,8 +3,9 @@ import { randomUUID } from "node:crypto";
 import { MongoServerError } from "mongodb";
 import type { UIMessage } from "ai";
 
-import { getMongoDb } from "@/lib/mongodb";
-import { userStorageKey } from "@/lib/storage-keys";
+import { getMongoDb } from "@/lib/db/mongodb";
+import { userStorageKey } from "@/lib/storage";
+import { normalizeUserId } from "@/lib/auth";
 
 const chatCollectionName = "chat_state";
 const maxStoredMessages = 120;
@@ -25,10 +26,6 @@ export type PersistedChatState = {
   messages: UIMessage[];
   updatedAt: string;
 };
-
-function normalizedUserId(userId: string | undefined) {
-  return userId?.trim() || "anonymous";
-}
 
 async function chatCollection() {
   const db = await getMongoDb();
@@ -114,7 +111,7 @@ async function createState(userId: string, userKey: string) {
 }
 
 export async function getChatState(userId: string | undefined) {
-  const normalized = normalizedUserId(userId);
+  const normalized = normalizeUserId(userId);
   const userKey = userStorageKey(normalized);
   const collection = await chatCollection();
   const existing = await collection.findOne({ _id: userKey });
@@ -133,7 +130,7 @@ export async function saveChatState(
     messages: UIMessage[];
   },
 ) {
-  const normalized = normalizedUserId(userId);
+  const normalized = normalizeUserId(userId);
   const userKey = userStorageKey(normalized);
   const now = new Date();
   const chatId = input.chatId.trim() || randomUUID();
@@ -164,7 +161,7 @@ export async function saveChatState(
 }
 
 export async function clearChatState(userId: string | undefined) {
-  const normalized = normalizedUserId(userId);
+  const normalized = normalizeUserId(userId);
   const userKey = userStorageKey(normalized);
   const now = new Date();
   const chatId = randomUUID();

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { tool } from "@openai/agents";
 
-import type { UploadedAttachment } from "@/lib/message-converters";
+import type { UploadedAttachment } from "@/lib/chat/message-converters";
 import {
   studentsFromResult,
   type StudentRow,
@@ -13,8 +13,10 @@ import {
   saveUploadedFile,
   type EngineResult,
   type StoredGradingSession,
-} from "@/lib/r2-storage";
-import { userStorageKey } from "@/lib/storage-keys";
+  type StoredUpload,
+  userStorageKey,
+} from "@/lib/storage";
+import { normalizeUserId } from "@/lib/auth";
 
 export type GradingContext = {
   attachments?: UploadedAttachment[];
@@ -25,6 +27,7 @@ type AttachmentFile = {
   bytes: Buffer;
   filename: string;
   mediaType: string;
+  storedUpload?: StoredUpload;
 };
 
 type ToolArgs = Record<string, unknown>;
@@ -42,17 +45,12 @@ type NonStrictToolSchema = {
 const gradeSubmissionsSchema: NonStrictToolSchema = {
   additionalProperties: true,
   properties: {
-    assignmentName: {
-      description:
-        "Assignment name in camelCase. Alias for assignment_name (for example S0).",
-      type: "string",
-    },
     assignment_name: {
       description: "Assignment name in snake_case (for example S0).",
       type: "string",
     },
   },
-  required: [],
+  required: ["assignment_name"],
   type: "object",
 };
 
@@ -114,7 +112,7 @@ async function parseEngineResponse(response: Response) {
 }
 
 function contextUserId(userId?: string) {
-  return userId?.trim() || "anonymous";
+  return normalizeUserId(userId);
 }
 
 async function rememberSession(
@@ -172,6 +170,13 @@ async function attachmentToFile(
       bytes: object.bytes,
       filename,
       mediaType: object.contentType ?? attachment.mediaType ?? "application/zip",
+      storedUpload: {
+        contentType:
+          object.contentType ?? attachment.mediaType ?? "application/zip",
+        filename,
+        key: object.key,
+        sizeBytes: object.bytes.byteLength,
+      },
     };
   }
 
@@ -249,18 +254,17 @@ function prune(row: StudentRow) {
   return Object.fromEntries(entries) as Partial<Omit<StudentRow, "sourceText">>;
 }
 
-export const gradeSubmissions = tool<typeof gradeSubmissionsSchema, GradingContext>({
+export const gradeSubmissions = tool<
+  typeof gradeSubmissionsSchema,
+  GradingContext
+>({
   description:
     "Grade student submissions from the zip file the user attached to this chat.",
   name: "grade_submissions",
   parameters: gradeSubmissionsSchema,
   strict: false,
   execute: async (args, runContext) => {
-    const assignmentName = pickStringArg(
-      args,
-      "assignment_name",
-      "assignmentName",
-    );
+    const assignmentName = pickStringArg(args, "assignment_name");
     if (!assignmentName) {
       return {
         message:
@@ -280,13 +284,15 @@ export const gradeSubmissions = tool<typeof gradeSubmissionsSchema, GradingConte
     const userId = contextUserId(runContext?.context.userId);
     const runId = randomUUID();
     const file = await attachmentToFile(attachment, userId);
-    const upload = await saveUploadedFile({
-      bytes: file.bytes,
-      contentType: file.mediaType,
-      filename: file.filename,
-      runId,
-      userId,
-    });
+    const upload =
+      file.storedUpload ??
+      (await saveUploadedFile({
+        bytes: file.bytes,
+        contentType: file.mediaType,
+        filename: file.filename,
+        runId,
+        userId,
+      }));
     const result = await gradeWithCurrentEngine(assignmentName, file);
     const now = new Date().toISOString();
 
@@ -302,6 +308,7 @@ export const gradeSubmissions = tool<typeof gradeSubmissionsSchema, GradingConte
     const students = studentsFromResult(result);
     return {
       assignmentName,
+      runId,
       studentCount: students.length,
       students: students.map(prune),
     };

@@ -4,7 +4,11 @@ import type { UIMessage } from "ai";
 
 import { gradingAgent } from "@/agents/grading";
 import { auth } from "@/auth";
-import { extractAttachments, toAgentInput } from "@/lib/message-converters";
+import {
+  extractLatestUserAttachments,
+  toAgentInput,
+} from "@/lib/chat/message-converters";
+import { resolveSessionUserId } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -32,8 +36,8 @@ export async function POST(req: Request) {
   try {
     const stream = await run(gradingAgent, input, {
       context: {
-        attachments: extractAttachments(messages),
-        userId: session.user.email ?? session.user.name ?? "unknown-user",
+        attachments: extractLatestUserAttachments(messages),
+        userId: resolveSessionUserId(session),
       },
       conversationId: chatId,
       maxTurns: 4,
