@@ -1,12 +1,20 @@
 import {
+  DeleteObjectCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
   S3ServiceException,
   type GetObjectCommandOutput,
 } from "@aws-sdk/client-s3";
 
-import { buildRunKeys, safeObjectFilename } from "./storage-keys";
+import {
+  buildRunKeys,
+  safeObjectFilename,
+  storagePrefix,
+  userStorageKey,
+} from "./storage-keys";
 
 export type EngineResult = Record<string, unknown>;
 
@@ -215,4 +223,63 @@ export async function getStoredFileByKey(key: string) {
     contentType: file.contentType,
     key: normalizedKey,
   };
+}
+
+export async function deleteStoredFileByKey(key: string) {
+  const normalizedKey = key.trim().replace(/^\/+/, "");
+  if (!normalizedKey) {
+    return;
+  }
+
+  await r2Client().send(
+    new DeleteObjectCommand({
+      Bucket: bucketName(),
+      Key: normalizedKey,
+    }),
+  );
+}
+
+async function deleteObjectsByPrefix(prefix: string) {
+  const normalizedPrefix = prefix.trim().replace(/^\/+/, "");
+  if (!normalizedPrefix) {
+    return;
+  }
+
+  let continuationToken: string | undefined;
+  do {
+    const listed = await r2Client().send(
+      new ListObjectsV2Command({
+        Bucket: bucketName(),
+        ContinuationToken: continuationToken,
+        Prefix: normalizedPrefix,
+      }),
+    );
+
+    const objects = (listed.Contents ?? [])
+      .map((object) => object.Key)
+      .filter((key): key is string => Boolean(key));
+
+    if (objects.length > 0) {
+      await r2Client().send(
+        new DeleteObjectsCommand({
+          Bucket: bucketName(),
+          Delete: {
+            Objects: objects.map((Key) => ({ Key })),
+            Quiet: true,
+          },
+        }),
+      );
+    }
+
+    continuationToken = listed.NextContinuationToken;
+  } while (continuationToken);
+}
+
+export async function deleteUserStoredRuns(userId: string) {
+  const prefix = storagePrefix();
+  const userKey = userStorageKey(userId);
+  await Promise.all([
+    deleteObjectsByPrefix(`${prefix}/uploads/${userKey}/`),
+    deleteObjectsByPrefix(`${prefix}/runs/${userKey}/`),
+  ]);
 }

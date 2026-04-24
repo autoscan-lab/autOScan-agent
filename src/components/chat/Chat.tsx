@@ -15,14 +15,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChatMessages } from "@/components/chat/ChatMessages";
 import { InspectorPanel } from "@/components/chat/InspectorPanel";
 import { ZipPromptInput } from "@/components/chat/ZipPromptInput";
-import { initialsOf } from "@/components/chat/display";
+import { initialsOf } from "@/components/chat/support/display";
 import { useGradingPanel } from "@/hooks/useGradingPanel";
 import { usePersistentChat } from "@/hooks/usePersistentChat";
 import type {
   ChatProps,
   UploadResponse,
   ZipPromptMessage,
-} from "@/components/chat/types";
+} from "@/components/chat/support/types";
 import {
   Conversation,
   ConversationContent,
@@ -133,14 +133,14 @@ export function Chat({
       }
 
       try {
-        const uploaded = await Promise.all(message.files.map(uploadAttachment));
+        const uploaded = message.files;
 
         if (uploaded.length > 0 && trimmedText) {
-          await sendMessage({ files: uploaded, text: trimmedText });
+          void sendMessage({ files: uploaded, text: trimmedText });
         } else if (uploaded.length > 0) {
-          await sendMessage({ files: uploaded });
+          void sendMessage({ files: uploaded });
         } else {
-          await sendMessage({ text: trimmedText });
+          void sendMessage({ text: trimmedText });
         }
       } catch (submitError) {
         setAttachmentError(
@@ -151,7 +151,7 @@ export function Chat({
         throw submitError;
       }
     },
-    [sendMessage, uploadAttachment],
+    [sendMessage],
   );
 
   useEffect(() => {
@@ -353,6 +353,7 @@ export function Chat({
                   onError={setAttachmentError}
                   onStop={stop}
                   onSubmit={handlePromptSubmit}
+                  onUploadFile={uploadAttachment}
                 />
               </div>
             </div>

@@ -1,8 +1,13 @@
 import type { UIMessage } from "ai";
 
 import { auth } from "@/auth";
-import { clearChatState, getChatState, saveChatState } from "@/lib/chat/chat-state";
+import {
+  clearChatState,
+  getChatState,
+  saveChatState,
+} from "@/lib/chat/chat-state";
 import { resolveSessionUserId } from "@/lib/auth";
+import { deleteUserStoredRuns } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -61,5 +66,11 @@ export async function DELETE() {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  return Response.json(await clearChatState(resolveSessionUserId(session)));
+  const userId = resolveSessionUserId(session);
+  const state = await clearChatState(userId);
+  await deleteUserStoredRuns(userId).catch((error: unknown) => {
+    console.error("[/api/chat/state] storage cleanup failed", error);
+  });
+
+  return Response.json(state);
 }

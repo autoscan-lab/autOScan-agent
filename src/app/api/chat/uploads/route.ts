@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 import { auth } from "@/auth";
-import { saveUploadedFile } from "@/lib/storage";
+import {
+  deleteStoredFileByKey,
+  saveUploadedFile,
+  userStorageKey,
+} from "@/lib/storage";
 import { resolveSessionUserId } from "@/lib/auth";
 
 export const runtime = "nodejs";
@@ -56,4 +60,26 @@ export async function POST(request: Request) {
     mediaType: storedUpload.contentType,
     url: `r2://${storedUpload.key}`,
   });
+}
+
+export async function DELETE(request: Request) {
+  const session = await auth();
+  if (!session?.user) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
+  const body = await request.json().catch(() => null);
+  const url = typeof body?.url === "string" ? body.url : "";
+  if (!url.startsWith("r2://")) {
+    return new Response("Invalid upload reference.", { status: 400 });
+  }
+
+  const key = url.slice("r2://".length).trim().replace(/^\/+/, "");
+  const userKey = userStorageKey(resolveSessionUserId(session));
+  if (!key.includes(`/uploads/${userKey}/`)) {
+    return new Response("Forbidden", { status: 403 });
+  }
+
+  await deleteStoredFileByKey(key);
+  return Response.json({ ok: true });
 }

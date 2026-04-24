@@ -3,7 +3,7 @@
 import { isToolUIPart, type UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { GradingRunResponse } from "@/components/chat/types";
+import type { GradingRunResponse } from "@/components/chat/support/types";
 
 function outputRecord(part: UIMessage["parts"][number]) {
   if (!("output" in part) || typeof part.output !== "object" || !part.output) {

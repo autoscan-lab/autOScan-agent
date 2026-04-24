@@ -1,4 +1,6 @@
 export {
+  deleteStoredFileByKey,
+  deleteUserStoredRuns,
   getGradingSession,
   getStoredFileByKey,
   saveGradingSession,

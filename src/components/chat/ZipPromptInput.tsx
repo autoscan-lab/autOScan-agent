@@ -1,17 +1,20 @@
 "use client";
 
 import {
+  CheckIcon,
   FileArchiveIcon,
+  Loader2Icon,
   PaperclipIcon,
   SendIcon,
   SquareIcon,
   XIcon,
 } from "lucide-react";
+import type { FileUIPart } from "ai";
 import type { FormEvent } from "react";
 import { useCallback, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
-import type { ZipPromptMessage } from "./types";
+import type { ZipPromptMessage } from "./support/types";
 
 export type ZipPromptInputProps = {
   accept: string;
@@ -20,11 +23,15 @@ export type ZipPromptInputProps = {
   onError: (message: string | null) => void;
   onStop: () => void;
   onSubmit: (message: ZipPromptMessage) => Promise<void>;
+  onUploadFile: (file: File) => Promise<FileUIPart>;
 };
 
 type SelectedFile = {
+  error?: string;
   file: File;
   id: string;
+  status: "error" | "ready" | "uploading";
+  uploaded?: FileUIPart;
 };
 
 function fileMatchesAccept(file: File, accept: string) {
@@ -50,11 +57,38 @@ export function ZipPromptInput({
   onError,
   onStop,
   onSubmit,
+  onUploadFile,
 }: ZipPromptInputProps) {
   const [text, setText] = useState("");
   const [files, setFiles] = useState<SelectedFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const uploadFile = useCallback(
+    async (file: File, id: string) => {
+      try {
+        const uploaded = await onUploadFile(file);
+        setFiles((current) =>
+          current.map((item) =>
+            item.id === id ? { ...item, status: "ready", uploaded } : item,
+          ),
+        );
+        onError(null);
+      } catch (uploadError) {
+        const message =
+          uploadError instanceof Error
+            ? uploadError.message
+            : "Attachment upload failed.";
+        setFiles((current) =>
+          current.map((item) =>
+            item.id === id ? { ...item, error: message, status: "error" } : item,
+          ),
+        );
+        onError(message);
+      }
+    },
+    [onError, onUploadFile],
+  );
 
   const addFiles = useCallback(
     (fileList: FileList | File[]) => {
@@ -74,10 +108,16 @@ export function ZipPromptInput({
       }
 
       onError(null);
-      setFiles([{ file: zip, id: crypto.randomUUID() }]);
+      const id = crypto.randomUUID();
+      setFiles([{ file: zip, id, status: "uploading" }]);
+      void uploadFile(zip, id);
     },
-    [accept, maxFileSize, onError],
+    [accept, maxFileSize, onError, uploadFile],
   );
+
+  const removeFile = useCallback((item: SelectedFile) => {
+    setFiles((current) => current.filter((file) => file.id !== item.id));
+  }, []);
 
   const handleSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -86,11 +126,17 @@ export function ZipPromptInput({
       if (!trimmedText && files.length === 0) {
         return;
       }
+      const uploadedFiles = files.flatMap((item) =>
+        item.uploaded ? [item.uploaded] : [],
+      );
+      if (uploadedFiles.length !== files.length) {
+        return;
+      }
 
       setSubmitting(true);
       try {
         await onSubmit({
-          files: files.map((item) => item.file),
+          files: uploadedFiles,
           text: trimmedText,
         });
         setText("");
@@ -105,7 +151,10 @@ export function ZipPromptInput({
     [files, onError, onSubmit, text],
   );
 
+  const uploading = files.some((item) => item.status === "uploading");
+  const hasUploadError = files.some((item) => item.status === "error");
   const disabled = busy || submitting;
+  const sendDisabled = submitting || uploading || hasUploadError;
 
   return (
     <form className="w-full" onSubmit={handleSubmit}>
@@ -133,10 +182,17 @@ export function ZipPromptInput({
               >
                 <FileArchiveIcon className="size-3.5 shrink-0" />
                 <span className="truncate">{item.file.name}</span>
+                {item.status === "uploading" ? (
+                  <Loader2Icon className="size-3 animate-spin text-[var(--chat-text-muted)]" />
+                ) : item.status === "ready" ? (
+                  <CheckIcon className="size-3 text-[var(--linear-success)]" />
+                ) : (
+                  <span className="text-[var(--linear-danger)]">failed</span>
+                )}
                 <button
                   aria-label="Remove attachment"
                   className="inline-flex size-4 items-center justify-center rounded-sm text-[var(--chat-text-muted)] transition-colors hover:bg-[var(--linear-ghost-hover)] hover:text-[var(--foreground)]"
-                  onClick={() => setFiles([])}
+                  onClick={() => removeFile(item)}
                   type="button"
                 >
                   <XIcon className="size-3" />
@@ -182,7 +238,7 @@ export function ZipPromptInput({
               busy &&
                 "bg-[var(--linear-surface-hover)] hover:bg-[var(--linear-surface-hover)]",
             )}
-            disabled={submitting}
+            disabled={sendDisabled}
             onClick={busy ? onStop : undefined}
             type={busy ? "button" : "submit"}
           >
