@@ -3,7 +3,7 @@
 import type { ChatStatus, UIMessage } from "ai";
 import { useCallback, useEffect, useRef } from "react";
 
-import { messageDigest } from "@/components/chat/message-digest";
+import { messageDigest } from "@/components/chat/messages/message-digest";
 
 type UsePersistentChatInput = {
   chatId: string;

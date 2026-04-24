@@ -14,7 +14,7 @@ import type { FormEvent } from "react";
 import { useCallback, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
-import type { ZipPromptMessage } from "./support/types";
+import type { ZipPromptMessage } from "../support/types";
 
 export type ZipPromptInputProps = {
   accept: string;

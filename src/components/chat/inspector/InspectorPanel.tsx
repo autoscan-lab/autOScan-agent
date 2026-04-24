@@ -3,16 +3,14 @@
 import { RefreshCwIcon } from "lucide-react";
 import { useMemo } from "react";
 
-import type { GradingRunResponse } from "./support/types";
-import {
-  BannedHitsSection,
-  CompileSection,
-  MetricsGrid,
-  NotesSection,
-  SourceSection,
-  StudentHeader,
-  TestsSection,
-} from "./inspector/InspectorSections";
+import type { GradingRunResponse } from "../support/types";
+import { BannedHitsSection } from "./BannedHitsSection";
+import { CompileSection } from "./CompileSection";
+import { MetricsGrid } from "./MetricsGrid";
+import { NotesSection } from "./NotesSection";
+import { SourceSection } from "./SourceSection";
+import { StudentHeader } from "./StudentHeader";
+import { TestsSection } from "./TestsSection";
 
 export type InspectorPanelProps = {
   data: GradingRunResponse | null;

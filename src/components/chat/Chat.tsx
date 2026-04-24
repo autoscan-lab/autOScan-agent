@@ -12,9 +12,9 @@ import dynamic from "next/dynamic";
 import { signOut } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { ChatMessages } from "@/components/chat/ChatMessages";
-import { InspectorPanel } from "@/components/chat/InspectorPanel";
-import { ZipPromptInput } from "@/components/chat/ZipPromptInput";
+import { ChatMessages } from "@/components/chat/messages/ChatMessages";
+import { InspectorPanel } from "@/components/chat/inspector/InspectorPanel";
+import { ZipPromptInput } from "@/components/chat/prompt/ZipPromptInput";
 import { initialsOf } from "@/components/chat/support/display";
 import { useGradingPanel } from "@/hooks/useGradingPanel";
 import { usePersistentChat } from "@/hooks/usePersistentChat";
