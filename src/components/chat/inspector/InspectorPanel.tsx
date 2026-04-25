@@ -38,28 +38,34 @@ function InspectorControls({
   view?: InspectorView;
 }) {
   return (
-    <div className="absolute right-14 top-[3px] z-10 flex items-center gap-1.5">
+    <div className="absolute right-11 top-[3px] z-10 flex items-center gap-2">
       {view && setView ? (
-        <DropdownMenu>
-          <DropdownMenuTrigger className="inline-flex h-7 items-center gap-1.5 rounded-md border border-[var(--linear-border)] bg-[#030304]/90 px-2.5 text-[11px] font-[510] text-[var(--chat-text-secondary)] shadow-[var(--shadow-dialog)] backdrop-blur-md transition-colors hover:bg-[#08080a] hover:text-[var(--foreground)]">
-            {viewLabel(view)}
-            <ChevronDownIcon className="size-3" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            align="end"
-            className="min-w-28 border border-[var(--linear-border)] bg-[#050506] text-[var(--foreground)]"
-          >
-            {(["source", "tests"] as InspectorView[]).map((value) => (
-              <DropdownMenuItem
-                className="text-[12px]"
-                key={value}
-                onClick={() => setView(value)}
-              >
-                {viewLabel(value)}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="inline-flex h-7 items-center gap-1.5 rounded-md border border-[var(--linear-border)] bg-[#030304]/90 px-2.5 text-[11px] font-[510] text-[var(--chat-text-secondary)] shadow-[var(--shadow-dialog)] backdrop-blur-md transition-colors hover:bg-[#08080a] hover:text-[var(--foreground)]">
+              {viewLabel(view)}
+              <ChevronDownIcon className="size-3" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="min-w-28 border border-[var(--linear-border)] bg-[#050506] text-[var(--foreground)]"
+            >
+              {(["source", "tests"] as InspectorView[]).map((value) => (
+                <DropdownMenuItem
+                  className="text-[12px]"
+                  key={value}
+                  onClick={() => setView(value)}
+                >
+                  {viewLabel(value)}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <span
+            aria-hidden
+            className="hidden h-4 w-px bg-[var(--linear-border-subtle)]/80 md:block"
+          />
+        </>
       ) : null}
     </div>
   );
