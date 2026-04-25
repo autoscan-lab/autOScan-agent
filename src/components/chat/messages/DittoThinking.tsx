@@ -196,7 +196,7 @@ export function DittoThinking({
             <span
               aria-hidden={index !== verbIndex}
               className={cn(
-                "absolute left-0 top-0 whitespace-nowrap font-[510] transition-all duration-300",
+                "absolute left-0 top-0 whitespace-nowrap font-[700] transition-all duration-300",
                 index === verbIndex
                   ? "translate-y-0 opacity-100"
                   : "translate-y-2 opacity-0",
@@ -206,7 +206,7 @@ export function DittoThinking({
               {verb.active}
             </span>
           ))}
-          <span className="invisible whitespace-nowrap font-[510]">
+          <span className="invisible whitespace-nowrap font-[700]">
             {cyclingVerbs.reduce(
               (longest, verb) =>
                 verb.active.length > longest.length ? verb.active : longest,
@@ -214,7 +214,7 @@ export function DittoThinking({
             )}
           </span>
         </span>
-        <span className="font-mono text-[var(--chat-text-muted)]">...</span>
+        <span className="font-[700]">...</span>
       </span>
     );
   }
@@ -225,7 +225,7 @@ export function DittoThinking({
   return (
     <span className="flex items-center gap-2 overflow-visible">
       <DittoSprite onClick={poke} state={pausedState} />
-      <span className="font-[510]">{label}</span>
+      <span className="font-[700]">{label}</span>
     </span>
   );
 }

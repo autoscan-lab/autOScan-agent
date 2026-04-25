@@ -178,14 +178,18 @@ export function Chat({
   });
 
   const {
+    aiDetectionReport,
     panelData,
     panelError,
     panelLoading,
     panelOpen,
+    panelView,
     resetPanel,
     selectedStudentId,
     setPanelOpen,
     setSelectedStudentId,
+    setPanelView,
+    similarityReport,
   } = useGradingPanel(messageList);
 
   const uploadAttachment = useCallback(
@@ -308,10 +312,14 @@ export function Chat({
 
   const inspectorNode = (
     <InspectorPanel
+      aiDetectionReport={aiDetectionReport}
       data={panelData}
       error={panelError}
       loading={panelLoading}
+      onViewChange={setPanelView}
       selectedStudentId={selectedStudentId}
+      similarityReport={similarityReport}
+      view={panelView}
     />
   );
 
@@ -445,6 +453,7 @@ export function Chat({
                 onAssistantElapsedSettled={handleAssistantElapsedSettled}
                 onSelectStudent={(studentId) => {
                   setSelectedStudentId(studentId);
+                  setPanelView("source");
                   setPanelOpen(true);
                 }}
                 selectedStudentId={selectedStudentId}

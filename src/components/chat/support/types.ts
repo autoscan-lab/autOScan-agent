@@ -19,6 +19,15 @@ export type StudentInspectorRow = StudentRow;
 
 export type GradingRunResponse = GradingRunSummary;
 
+export type InspectorView = "source" | "tests" | "similarity" | "aiDetection";
+
+export type ToolReport = {
+  assignmentName: string | null;
+  payload: unknown;
+  runId: string | null;
+  toolCallId: string;
+};
+
 export type ZipPromptMessage = {
   files: FileUIPart[];
   text: string;

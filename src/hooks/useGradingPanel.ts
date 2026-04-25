@@ -3,13 +3,40 @@
 import { isToolUIPart, type UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { GradingRunResponse } from "@/components/chat/support/types";
+import type {
+  GradingRunResponse,
+  InspectorView,
+  ToolReport,
+} from "@/components/chat/support/types";
+
+type GradingRun = {
+  runId: string;
+  toolCallId: string;
+};
+
+type LatestInspectorEvent =
+  | { kind: "grading"; toolCallId: string }
+  | { kind: "similarity"; toolCallId: string }
+  | { kind: "aiDetection"; toolCallId: string };
+
+type ToolReports = {
+  aiDetectionReport: ToolReport | null;
+  currentRun: GradingRun | undefined;
+  latestEvent: LatestInspectorEvent | undefined;
+  similarityReport: ToolReport | null;
+};
 
 function outputRecord(part: UIMessage["parts"][number]) {
   if (!("output" in part) || typeof part.output !== "object" || !part.output) {
     return undefined;
   }
   return part.output as Record<string, unknown>;
+}
+
+function stringOf(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : null;
 }
 
 function toolNameOf(part: UIMessage["parts"][number]) {
@@ -41,7 +68,37 @@ function gradingRunFromPart(part: UIMessage["parts"][number]) {
   };
 }
 
-function latestGradingRun(messages: UIMessage[]) {
+function followupReportFromPart(
+  part: UIMessage["parts"][number],
+  expectedToolName: "check_similarity" | "check_ai_detection",
+  payloadField: "similarity" | "aiDetection",
+): ToolReport | undefined {
+  if (!isToolUIPart(part) || part.state !== "output-available") {
+    return undefined;
+  }
+  if (toolNameOf(part) !== expectedToolName) {
+    return undefined;
+  }
+
+  const output = outputRecord(part);
+  if (!output) {
+    return undefined;
+  }
+
+  return {
+    assignmentName: stringOf(output.assignmentName),
+    payload: output[payloadField] ?? null,
+    runId: stringOf(output.runId),
+    toolCallId: part.toolCallId,
+  };
+}
+
+function scanToolReports(messages: UIMessage[]): ToolReports {
+  let currentRun: GradingRun | undefined;
+  let similarityReport: ToolReport | null = null;
+  let aiDetectionReport: ToolReport | null = null;
+  let latestEvent: LatestInspectorEvent | undefined;
+
   for (
     let messageIndex = messages.length - 1;
     messageIndex >= 0;
@@ -52,19 +109,59 @@ function latestGradingRun(messages: UIMessage[]) {
       continue;
     }
 
-    for (
-      let partIndex = message.parts.length - 1;
-      partIndex >= 0;
-      partIndex--
-    ) {
-      const run = gradingRunFromPart(message.parts[partIndex]);
+    for (let partIndex = message.parts.length - 1; partIndex >= 0; partIndex--) {
+      const part = message.parts[partIndex];
+      const run = currentRun ? undefined : gradingRunFromPart(part);
+      const similarity: ToolReport | undefined = similarityReport
+        ? undefined
+        : followupReportFromPart(part, "check_similarity", "similarity");
+      const aiDetection: ToolReport | undefined = aiDetectionReport
+        ? undefined
+        : followupReportFromPart(part, "check_ai_detection", "aiDetection");
+
+      if (!latestEvent) {
+        if (aiDetection) {
+          latestEvent = {
+            kind: "aiDetection",
+            toolCallId: aiDetection.toolCallId,
+          };
+        } else if (similarity) {
+          latestEvent = {
+            kind: "similarity",
+            toolCallId: similarity.toolCallId,
+          };
+        } else if (run) {
+          latestEvent = { kind: "grading", toolCallId: run.toolCallId };
+        }
+      }
+
       if (run) {
-        return run;
+        currentRun = run;
+      }
+      if (similarity) {
+        similarityReport = similarity;
+      }
+      if (aiDetection) {
+        aiDetectionReport = aiDetection;
+      }
+
+      if (currentRun && similarityReport && aiDetectionReport && latestEvent) {
+        return {
+          aiDetectionReport,
+          currentRun,
+          latestEvent,
+          similarityReport,
+        };
       }
     }
   }
 
-  return undefined;
+  return {
+    aiDetectionReport,
+    currentRun,
+    latestEvent,
+    similarityReport,
+  };
 }
 
 export function useGradingPanel(messages: UIMessage[]) {
@@ -72,11 +169,17 @@ export function useGradingPanel(messages: UIMessage[]) {
   const [panelLoading, setPanelLoading] = useState(false);
   const [panelError, setPanelError] = useState<string | null>(null);
   const [panelData, setPanelData] = useState<GradingRunResponse | null>(null);
+  const [panelView, setPanelView] = useState<InspectorView>("source");
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(
     null,
   );
 
-  const currentRun = useMemo(() => latestGradingRun(messages), [messages]);
+  const {
+    aiDetectionReport,
+    currentRun,
+    latestEvent,
+    similarityReport,
+  } = useMemo(() => scanToolReports(messages), [messages]);
   const loadedRunId = useRef<string | null>(null);
   const openedToolCallId = useRef<string | null>(null);
 
@@ -125,34 +228,49 @@ export function useGradingPanel(messages: UIMessage[]) {
   }, [currentRun?.runId, refreshPanelData]);
 
   useEffect(() => {
-    if (!currentRun?.toolCallId) {
+    if (!latestEvent?.toolCallId) {
       return;
     }
-    if (currentRun.toolCallId === openedToolCallId.current) {
+    if (latestEvent.toolCallId === openedToolCallId.current) {
       return;
     }
-    openedToolCallId.current = currentRun.toolCallId;
-    setPanelOpen(true);
-  }, [currentRun?.toolCallId]);
+    openedToolCallId.current = latestEvent.toolCallId;
+    const nextView =
+      latestEvent.kind === "similarity"
+        ? "similarity"
+        : latestEvent.kind === "aiDetection"
+          ? "aiDetection"
+          : "source";
+    const timeout = window.setTimeout(() => {
+      setPanelView(nextView);
+      setPanelOpen(true);
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [latestEvent?.kind, latestEvent?.toolCallId]);
 
   const resetPanel = useCallback(() => {
     setPanelOpen(false);
     setPanelLoading(false);
     setPanelError(null);
     setPanelData(null);
+    setPanelView("source");
     setSelectedStudentId(null);
     loadedRunId.current = null;
     openedToolCallId.current = null;
   }, []);
 
   return {
+    aiDetectionReport,
     panelData,
     panelError,
     panelLoading,
     panelOpen,
+    panelView,
     resetPanel,
     selectedStudentId,
     setPanelOpen,
     setSelectedStudentId,
+    setPanelView,
+    similarityReport,
   };
 }
