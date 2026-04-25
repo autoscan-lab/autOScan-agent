@@ -181,8 +181,14 @@ function thoughtTrailTitle(steps: ThoughtStep[]) {
   return "Tool activity";
 }
 
-function ReasoningStepItem({ part }: { part: ReasoningUIPart }) {
-  const isActive = part.state === "streaming";
+function ReasoningStepItem({
+  isModelBusy,
+  part,
+}: {
+  isModelBusy: boolean;
+  part: ReasoningUIPart;
+}) {
+  const isActive = isModelBusy && part.state === "streaming";
   return (
     <ChainOfThoughtStep
       icon={BrainIcon}
@@ -192,10 +198,17 @@ function ReasoningStepItem({ part }: { part: ReasoningUIPart }) {
   );
 }
 
-function ToolStepItem({ part }: { part: ToolPart }) {
+function ToolStepItem({
+  isModelBusy,
+  part,
+}: {
+  isModelBusy: boolean;
+  part: ToolPart;
+}) {
   const toolName = toolNameOf(part);
   const isRunning =
-    part.state === "input-streaming" || part.state === "input-available";
+    isModelBusy &&
+    (part.state === "input-streaming" || part.state === "input-available");
   const isError = part.state === "output-error";
   const errorText = "errorText" in part ? part.errorText : undefined;
   const label = toolStepLabel(toolName, part);
@@ -227,8 +240,14 @@ function stepActivity(step: ThoughtStep) {
   return state === "input-streaming" || state === "input-available";
 }
 
-function AssistantThoughtTrail({ steps }: { steps: ThoughtStep[] }) {
-  const anyActive = useMemo(() => steps.some(stepActivity), [steps]);
+function AssistantThoughtTrail({
+  isModelBusy,
+  steps,
+}: {
+  isModelBusy: boolean;
+  steps: ThoughtStep[];
+}) {
+  const anyActive = isModelBusy && useMemo(() => steps.some(stepActivity), [steps]);
 
   const [open, setOpen] = useState(false);
 
@@ -263,11 +282,13 @@ function AssistantThoughtTrail({ steps }: { steps: ThoughtStep[] }) {
         {visibleSteps.map((step, index) =>
           step.kind === "reasoning" ? (
             <ReasoningStepItem
+              isModelBusy={isModelBusy}
               key={`step-${index}`}
               part={step.part}
             />
           ) : (
             <ToolStepItem
+              isModelBusy={isModelBusy}
               key={`step-${index}`}
               part={step.part}
             />
@@ -529,7 +550,12 @@ export function ChatMessages({
         <MessageContent
           className={cn("gap-3", isAssistant && "w-full max-w-full")}
         >
-          {isAssistant ? <AssistantThoughtTrail steps={thoughtSteps} /> : null}
+          {isAssistant ? (
+            <AssistantThoughtTrail
+              isModelBusy={showDitto ? isModelBusy : false}
+              steps={thoughtSteps}
+            />
+          ) : null}
           {message.parts.map((part, index) => {
             const key = `${message.id}-${index}`;
 
