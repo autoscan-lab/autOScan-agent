@@ -449,6 +449,7 @@ export function Chat({
               className="mx-auto w-full max-w-[var(--chat-column-w)] gap-6 px-3 pb-44 pt-6 md:px-6"
             >
               <ChatMessages
+                isModelBusy={isModelBusy}
                 messages={messageList}
                 onAssistantElapsedSettled={handleAssistantElapsedSettled}
                 onSelectStudent={(studentId) => {

@@ -44,6 +44,7 @@ type ThoughtStep =
   | { kind: "tool"; part: ToolPart };
 
 type ChatMessagesProps = {
+  isModelBusy?: boolean;
   messages: UIMessage[];
   onAssistantElapsedSettled?: (messageId: string, elapsedMs: number) => void;
   onSelectStudent?: (studentId: string) => void;
@@ -422,7 +423,7 @@ function GradingResultsTable({
   }
 
   return (
-    <div className="mt-2 overflow-x-auto rounded-lg border border-[var(--linear-border)] bg-[var(--linear-panel)] shadow-[0_16px_44px_-28px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.03)]">
+    <div className="overflow-x-auto rounded-lg border border-[var(--linear-border)] bg-[var(--linear-panel)] shadow-[0_16px_44px_-28px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.03)]">
       <div className="min-w-full">
         <div
           className="grid border-b border-[var(--linear-border-subtle)] bg-[var(--linear-ghost)] font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--chat-text-muted)]"
@@ -495,6 +496,7 @@ function buildWelcomeText(userName?: string | null) {
 }
 
 export function ChatMessages({
+  isModelBusy = false,
   messages,
   onAssistantElapsedSettled,
   onSelectStudent,
@@ -523,7 +525,7 @@ export function ChatMessages({
     const isAssistant = message.role === "assistant";
     const showDitto = isAssistant && message.id === lastAssistantMessageId;
     const thoughtSteps = isAssistant ? extractThoughtSteps(message) : [];
-    const dittoActive = showDitto && thoughtSteps.some(stepActivity);
+    const dittoActive = showDitto && (isModelBusy || thoughtSteps.some(stepActivity));
 
     return (
       <Message

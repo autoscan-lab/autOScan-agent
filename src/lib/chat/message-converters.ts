@@ -1,5 +1,11 @@
-import { assistant, user, type AgentInputItem } from "@openai/agents";
-import type { FileUIPart, UIMessage } from "ai";
+import {
+  assistant,
+  user,
+  type AgentInputItem,
+  type FunctionCallItem,
+  type FunctionCallResultItem,
+} from "@openai/agents";
+import type { DynamicToolUIPart, FileUIPart, UIMessage } from "ai";
 
 export type UploadedAttachment = {
   filename?: string;
@@ -22,6 +28,12 @@ function isTextPart(part: UIMessage["parts"][number]): part is TextPart {
 
 function isFilePart(part: UIMessage["parts"][number]): part is FileUIPart {
   return part.type === "file";
+}
+
+function isDynamicToolPart(
+  part: UIMessage["parts"][number],
+): part is DynamicToolUIPart {
+  return part.type === "dynamic-tool";
 }
 
 export function extractUiMessageText(message: UiMessageWithLegacyContent) {
@@ -78,19 +90,38 @@ export function toAgentInput(
       continue;
     }
 
-    const text =
-      `${extractUiMessageText(message)}${describeFiles(message)}`.trim();
-    if (!text) {
-      continue;
-    }
+    if (message.role === "assistant") {
+      const toolParts = message.parts?.filter(isDynamicToolPart) ?? [];
 
-    switch (message.role) {
-      case "assistant":
+      for (const part of toolParts) {
+        if (part.state !== "output-available") continue;
+
+        input.push({
+          type: "function_call",
+          callId: part.toolCallId,
+          name: part.toolName,
+          arguments: JSON.stringify(part.input ?? {}),
+        } as FunctionCallItem);
+
+        input.push({
+          type: "function_call_result",
+          callId: part.toolCallId,
+          name: part.toolName,
+          status: "completed",
+          output: JSON.stringify(part.output ?? null),
+        } as FunctionCallResultItem);
+      }
+
+      const text =
+        `${extractUiMessageText(message)}${describeFiles(message)}`.trim();
+      if (text) {
         input.push(assistant(text));
-        break;
-      default:
-        input.push(user(text));
-        break;
+      }
+    } else {
+      const text =
+        `${extractUiMessageText(message)}${describeFiles(message)}`.trim();
+      if (!text) continue;
+      input.push(user(text));
     }
   }
 

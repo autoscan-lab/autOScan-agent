@@ -203,7 +203,7 @@ export function DittoThinking({
               )}
               key={verb.active}
             >
-              {verb.active}
+              {verb.active}...
             </span>
           ))}
           <span className="invisible whitespace-nowrap font-[700]">
@@ -211,10 +211,9 @@ export function DittoThinking({
               (longest, verb) =>
                 verb.active.length > longest.length ? verb.active : longest,
               "",
-            )}
+            )}...
           </span>
         </span>
-        <span className="font-[700]">...</span>
       </span>
     );
   }
