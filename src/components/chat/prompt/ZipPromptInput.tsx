@@ -217,7 +217,7 @@ export function ZipPromptInput({
             event.preventDefault();
             event.currentTarget.form?.requestSubmit();
           }}
-          placeholder="Attach a zip and ask for grading..."
+          placeholder={busy ? "Waiting for response..." : "Attach a zip and ask for grading..."}
           value={text}
         />
 
@@ -236,14 +236,14 @@ export function ZipPromptInput({
             className={cn(
               "inline-flex size-8 items-center justify-center rounded-md border border-transparent bg-primary text-primary-foreground shadow-[var(--shadow-ring)] transition-colors hover:bg-[var(--linear-accent-hover)] disabled:opacity-50",
               busy &&
-                "bg-[var(--linear-surface-hover)] hover:bg-[var(--linear-surface-hover)]",
+                "border-[var(--linear-border)] bg-[var(--linear-ghost)] text-[var(--foreground)] shadow-none hover:bg-[var(--linear-ghost-hover)] hover:text-[var(--linear-danger)]",
             )}
             disabled={sendDisabled}
             onClick={busy ? onStop : undefined}
             type={busy ? "button" : "submit"}
           >
             {busy ? (
-              <SquareIcon className="size-4" />
+              <SquareIcon className="size-3.5" />
             ) : (
               <SendIcon className="size-4" />
             )}

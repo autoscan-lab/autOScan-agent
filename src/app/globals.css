@@ -272,7 +272,7 @@
  * holds the final frame so the ditto rests in place.
  */
 .ditto-sprite {
-  --ditto-frame: 28px;
+  --ditto-frame: 36px;
   width: var(--ditto-frame);
   height: var(--ditto-frame);
   background-image: url("/ditto-strip.webp");

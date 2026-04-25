@@ -42,7 +42,7 @@ const PixelBlastBackground = dynamic(() => import("@/components/chat/PixelBlast"
   ssr: false,
 });
 
-const chatWatchdogMs = 180_000;
+const chatWatchdogMs = 120_000;
 const maxZipUploadBytes = 12 * 1024 * 1024;
 const zipAcceptAttr = ".zip,application/zip,application/x-zip-compressed";
 const assignmentPattern = /\bS\d+\b/i;
