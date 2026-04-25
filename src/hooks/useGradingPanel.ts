@@ -97,10 +97,14 @@ function followupReportFromPart(
   if (!output) {
     return undefined;
   }
+  const payload = output[payloadField];
+  if (payload === undefined || payload === null) {
+    return undefined;
+  }
 
   return {
     assignmentName: stringOf(output.assignmentName),
-    payload: output[payloadField] ?? null,
+    payload,
     runId: followupRunIdFromPart(part),
     toolCallId: part.toolCallId,
   };

@@ -128,6 +128,10 @@ function assignmentNameFromToolPart(part: ToolPart) {
   return stringOf(input?.assignment_name) ?? stringOf(output?.assignmentName);
 }
 
+function toolCallLabel(toolName: string, isRunning: boolean) {
+  return isRunning ? `Calling ${toolName}...` : `Called ${toolName}`;
+}
+
 function toolStepLabel(
   toolName: string,
   isRunning: boolean,
@@ -135,15 +139,11 @@ function toolStepLabel(
 ) {
   switch (toolName) {
     case "check_similarity": {
-      return isRunning
-        ? "Calling check_similarity..."
-        : "Called check_similarity";
+      return toolCallLabel(toolName, isRunning);
     }
 
     case "check_ai_detection": {
-      return isRunning
-        ? "Calling check_ai_detection..."
-        : "Called check_ai_detection";
+      return toolCallLabel(toolName, isRunning);
     }
 
     case "grade_submissions": {
@@ -170,25 +170,19 @@ function thoughtTrailTitle(steps: ThoughtStep[]) {
       const assignment = assignmentNameFromToolPart(step.part);
       return assignment ? `Grade ${assignment}` : "Grade submissions";
     }
-    if (toolName === "check_similarity") {
-      return "Similarity";
-    }
-    if (toolName === "check_ai_detection") {
-      return "AI detection";
-    }
+    if (toolName === "check_similarity") return "Similarity";
+    if (toolName === "check_ai_detection") return "AI detection";
     return prettyToolTitle(toolName);
   }
   return "Tool activity";
 }
 
 function ReasoningStepItem({
-  isModelBusy,
   part,
 }: {
-  isModelBusy: boolean;
   part: ReasoningUIPart;
 }) {
-  const isActive = isModelBusy && part.state === "streaming";
+  const isActive = part.state === "streaming";
   return (
     <ChainOfThoughtStep
       icon={BrainIcon}
@@ -199,16 +193,13 @@ function ReasoningStepItem({
 }
 
 function ToolStepItem({
-  isModelBusy,
   part,
 }: {
-  isModelBusy: boolean;
   part: ToolPart;
 }) {
   const toolName = toolNameOf(part);
   const isRunning =
-    isModelBusy &&
-    (part.state === "input-streaming" || part.state === "input-available");
+    part.state === "input-streaming" || part.state === "input-available";
   const isError = part.state === "output-error";
   const errorText = "errorText" in part ? part.errorText : undefined;
   const label = toolStepLabel(
@@ -245,14 +236,12 @@ function stepActivity(step: ThoughtStep) {
 }
 
 function AssistantThoughtTrail({
-  isModelBusy,
   steps,
 }: {
-  isModelBusy: boolean;
   steps: ThoughtStep[];
 }) {
   const stepsActive = useMemo(() => steps.some(stepActivity), [steps]);
-  const anyActive = isModelBusy && stepsActive;
+  const anyActive = stepsActive;
 
   const [open, setOpen] = useState(false);
 
@@ -287,13 +276,11 @@ function AssistantThoughtTrail({
         {visibleSteps.map((step, index) =>
           step.kind === "reasoning" ? (
             <ReasoningStepItem
-              isModelBusy={isModelBusy}
               key={`step-${index}`}
               part={step.part}
             />
           ) : (
             <ToolStepItem
-              isModelBusy={isModelBusy}
               key={`step-${index}`}
               part={step.part}
             />
@@ -336,26 +323,16 @@ function rowState(row: GradingResultRow) {
 }
 
 type RowState = ReturnType<typeof rowState>;
-
-function rowStatusLabel(state: RowState) {
-  if (state === "failed") {
-    return "failed";
-  }
-  if (state === "banned") {
-    return "banned";
-  }
-  return "clean";
-}
-
-function rowStatusTone(state: RowState) {
-  if (state === "failed") {
-    return "text-[var(--linear-danger)]";
-  }
-  if (state === "banned") {
-    return "text-orange-300";
-  }
-  return "text-[var(--linear-success)]";
-}
+const rowStatusLabelMap: Record<RowState, string> = {
+  banned: "banned",
+  clean: "clean",
+  failed: "failed",
+};
+const rowStatusToneMap: Record<RowState, string> = {
+  banned: "text-orange-300",
+  clean: "text-[var(--linear-success)]",
+  failed: "text-[var(--linear-danger)]",
+};
 
 function gradeTone(grade: string) {
   const numericGrade = Number.parseFloat(grade);
@@ -385,8 +362,8 @@ function rowPresentation(row: GradingResultRow) {
   return {
     grade,
     gradeTone: gradeTone(grade),
-    statusLabel: rowStatusLabel(state),
-    statusTone: rowStatusTone(state),
+    statusLabel: rowStatusLabelMap[state],
+    statusTone: rowStatusToneMap[state],
   };
 }
 
@@ -562,10 +539,7 @@ export function ChatMessages({
           className={cn("gap-3", isAssistant && "w-full max-w-full")}
         >
           {isAssistant ? (
-            <AssistantThoughtTrail
-              isModelBusy={showDitto ? isModelBusy : false}
-              steps={thoughtSteps}
-            />
+            <AssistantThoughtTrail steps={thoughtSteps} />
           ) : null}
           {message.parts.map((part, index) => {
             const key = `${message.id}-${index}`;

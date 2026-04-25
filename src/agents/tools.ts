@@ -45,6 +45,7 @@ type NonStrictToolSchema = {
   required: string[];
   type: "object";
 };
+type FollowupPayloadField = "similarity" | "aiDetection";
 
 const gradeSubmissionsSchema: NonStrictToolSchema = {
   additionalProperties: true,
@@ -322,12 +323,48 @@ function pickFollowupResult(
   return null;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function flaggedCount(values: unknown[]) {
+  return values.reduce<number>(
+    (count, value) => count + (isRecord(value) && value.flagged === true ? 1 : 0),
+    0,
+  );
+}
+
+function summarizeFollowupPayload(
+  payloadField: FollowupPayloadField,
+  payload: unknown,
+) {
+  if (!isRecord(payload)) {
+    return { hasReport: false };
+  }
+
+  if (payloadField === "similarity") {
+    const pairs = Array.isArray(payload.pairs) ? payload.pairs : [];
+    return {
+      flaggedPairs: flaggedCount(pairs),
+      hasReport: true,
+      pairCount: pairs.length,
+    };
+  }
+
+  const submissions = Array.isArray(payload.submissions) ? payload.submissions : [];
+  return {
+    flaggedSubmissions: flaggedCount(submissions),
+    hasReport: true,
+    submissionCount: submissions.length,
+  };
+}
+
 async function runFollowup(
   args: unknown,
   runContext: { context: GradingContext } | undefined,
   options: EngineGradeOptions,
-  payloadKeys: string[],
-  payloadField: string,
+  payloadKeys: readonly string[],
+  payloadField: FollowupPayloadField,
 ) {
   const runId = pickStringArg(args, "run_id");
   if (!runId) {
@@ -356,10 +393,13 @@ async function runFollowup(
     updatedAt: now,
   });
 
+  const payload = pickFollowupResult(result, ...payloadKeys);
+
   return {
-    [payloadField]: pickFollowupResult(result, ...payloadKeys),
+    [payloadField]: payload,
     assignmentName: loaded.session.assignmentName,
     runId,
+    summary: summarizeFollowupPayload(payloadField, payload),
   };
 }
 

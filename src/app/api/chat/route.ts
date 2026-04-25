@@ -40,7 +40,7 @@ export async function POST(req: Request) {
         userId: resolveSessionUserId(session),
       },
       conversationId: chatId,
-      maxTurns: 4,
+      maxTurns: 6,
       stream: true,
     });
 

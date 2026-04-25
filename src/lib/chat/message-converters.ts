@@ -127,6 +127,10 @@ function describeFiles(message: UIMessage) {
   return `\n\nAttached files available to tools: ${names}.`;
 }
 
+function messageTextWithFiles(message: UIMessage) {
+  return `${extractUiMessageText(message)}${describeFiles(message)}`.trim();
+}
+
 export function extractLatestUserAttachments(
   messages: UIMessage[],
 ): UploadedAttachment[] {
@@ -172,14 +176,12 @@ export function toAgentInput(messages: UIMessage[]): AgentInputItem[] {
         } as FunctionCallResultItem);
       }
 
-      const text =
-        `${extractUiMessageText(message)}${describeFiles(message)}`.trim();
+      const text = messageTextWithFiles(message);
       if (text) {
         input.push(assistant(text));
       }
     } else {
-      const text =
-        `${extractUiMessageText(message)}${describeFiles(message)}`.trim();
+      const text = messageTextWithFiles(message);
       if (!text) continue;
       input.push(user(text));
     }
