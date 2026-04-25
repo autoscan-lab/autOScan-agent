@@ -124,8 +124,9 @@ function scoreTone(flagged: boolean, score: number) {
   return "text-[var(--chat-text-muted)]";
 }
 
-function titleFor(kind: ReportKind) {
-  return kind === "similarity" ? "Similarity" : "AI detection";
+function studentLabel(value: string) {
+  const parts = value.split("/").filter(Boolean);
+  return parts.at(-1) ?? value;
 }
 
 function EmptyReport({ children }: { children: React.ReactNode }) {
@@ -136,92 +137,63 @@ function EmptyReport({ children }: { children: React.ReactNode }) {
   );
 }
 
-function ReportHeader({
-  assignmentName,
-  kind,
-  sourceFile,
-}: {
-  assignmentName: string | null;
-  kind: ReportKind;
-  sourceFile: string | null;
-}) {
-  return (
-    <div className="mb-3 flex items-center justify-between gap-3">
-      <div className="min-w-0">
-        <h2 className="text-[13px] font-[650] text-[var(--foreground)]">
-          {titleFor(kind)}
-        </h2>
-        {sourceFile ? (
-          <p className="mt-0.5 truncate font-mono text-[11px] text-[var(--chat-text-muted)]">
-            {sourceFile}
-          </p>
-        ) : null}
-      </div>
-      {assignmentName ? (
-        <span className="shrink-0 font-mono text-[11px] text-[var(--chat-text-muted)]">
-          {assignmentName}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
 function SimilaritySection({ report }: { report: ToolReport }) {
   const similarity = similarityReportOf(report.payload);
 
   if (!similarity) {
-    return (
-      <>
-        <ReportHeader
-          assignmentName={report.assignmentName}
-          kind="similarity"
-          sourceFile={null}
-        />
-        <EmptyReport>Similarity report was not returned in the expected shape.</EmptyReport>
-      </>
-    );
+    return <EmptyReport>Similarity report was not returned in the expected shape.</EmptyReport>;
+  }
+
+  if (similarity.pairs.length === 0) {
+    return <EmptyReport>No similar submissions reported.</EmptyReport>;
   }
 
   return (
-    <>
-      <ReportHeader
-        assignmentName={report.assignmentName}
-        kind="similarity"
-        sourceFile={similarity.source_file}
-      />
-      {similarity.pairs.length > 0 ? (
-        <div className="overflow-hidden rounded-lg bg-[var(--linear-ghost)]">
+    <div className="w-full overflow-x-auto">
+      <table className="w-full border-collapse text-[12px]">
+        <thead className="sticky top-0 z-[1] bg-[#050506]/95 backdrop-blur">
+          <tr className="border-b border-[var(--linear-border)] font-mono uppercase tracking-[0.08em] text-[10px] text-[var(--chat-text-muted)]">
+            <th className="px-4 py-2.5 text-left font-[510]">Student A</th>
+            <th className="px-4 py-2.5 text-left font-[510]">Student B</th>
+            <th className="px-4 py-2.5 text-right font-[510]">Similarity</th>
+            <th className="px-4 py-2.5 text-right font-[510]">Flagged</th>
+          </tr>
+        </thead>
+        <tbody>
           {similarity.pairs.map((pair) => (
-            <div
-              className="border-b border-[var(--linear-border-subtle)] px-3 py-2.5 last:border-b-0"
+            <tr
+              className="border-b border-[var(--linear-border-subtle)] text-[13px] last:border-b-0"
               key={`${pair.a}-${pair.b}`}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-[13px] font-[560] text-[var(--foreground)]">
-                    {pair.a} / {pair.b}
-                  </p>
-                  <p className="mt-0.5 truncate text-[12px] text-[var(--chat-text-muted)]">
-                    {pair.flagged ? "flagged" : "not flagged"} ·{" "}
-                    {pair.window_matches} shared windows
-                  </p>
-                </div>
-                <span
-                  className={cn(
-                    "shrink-0 font-mono text-[12px] font-[650]",
-                    scoreTone(pair.flagged, pair.window_jaccard),
-                  )}
-                >
-                  {percent(pair.window_jaccard)}
-                </span>
-              </div>
-            </div>
+              <td className="px-4 py-2.5 font-[560] text-[var(--foreground)]">
+                {studentLabel(pair.a)}
+              </td>
+              <td className="px-4 py-2.5 font-[560] text-[var(--foreground)]">
+                {studentLabel(pair.b)}
+              </td>
+              <td
+                className={cn(
+                  "px-4 py-2.5 text-right font-mono font-[650]",
+                  scoreTone(pair.flagged, pair.window_jaccard),
+                )}
+              >
+                {percent(pair.window_jaccard)}
+              </td>
+              <td
+                className={cn(
+                  "px-4 py-2.5 text-right font-[560]",
+                  pair.flagged
+                    ? "text-[var(--linear-danger)]"
+                    : "text-[var(--chat-text-muted)]",
+                )}
+              >
+                {pair.flagged ? "Yes" : "No"}
+              </td>
+            </tr>
           ))}
-        </div>
-      ) : (
-        <EmptyReport>No similar submissions reported.</EmptyReport>
-      )}
-    </>
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -229,71 +201,57 @@ function AIDetectionSection({ report }: { report: ToolReport }) {
   const detection = aiDetectionReportOf(report.payload);
 
   if (!detection) {
-    return (
-      <>
-        <ReportHeader
-          assignmentName={report.assignmentName}
-          kind="aiDetection"
-          sourceFile={null}
-        />
-        <EmptyReport>AI detection report was not returned in the expected shape.</EmptyReport>
-      </>
-    );
+    return <EmptyReport>AI detection report was not returned in the expected shape.</EmptyReport>;
+  }
+
+  if (detection.submissions.length === 0) {
+    return <EmptyReport>No AI detection flags reported.</EmptyReport>;
   }
 
   return (
-    <>
-      <ReportHeader
-        assignmentName={report.assignmentName}
-        kind="aiDetection"
-        sourceFile={detection.source_file}
-      />
-      {detection.submissions.length > 0 ? (
-        <div className="overflow-hidden rounded-lg bg-[var(--linear-ghost)]">
+    <div className="w-full overflow-x-auto">
+      <table className="w-full border-collapse text-[12px]">
+        <thead className="sticky top-0 z-[1] bg-[#050506]/95 backdrop-blur">
+          <tr className="border-b border-[var(--linear-border)] font-mono uppercase tracking-[0.08em] text-[10px] text-[var(--chat-text-muted)]">
+            <th className="px-4 py-2.5 text-left font-[510]">Student</th>
+            <th className="px-4 py-2.5 text-right font-[510]">AI score</th>
+            <th className="px-4 py-2.5 text-right font-[510]">Flagged</th>
+          </tr>
+        </thead>
+        <tbody>
           {detection.submissions.map((submission) => (
-            <div
-              className="border-b border-[var(--linear-border-subtle)] px-3 py-2.5 last:border-b-0"
+            <tr
+              className="border-b border-[var(--linear-border-subtle)] text-[13px] last:border-b-0"
               key={submission.id}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-[13px] font-[560] text-[var(--foreground)]">
-                    {submission.id}
-                  </p>
-                  <p className="mt-0.5 truncate text-[12px] text-[var(--chat-text-muted)]">
-                    {submission.parse_error
-                      ? "parse error"
-                      : submission.flagged
-                        ? "flagged"
-                        : "not flagged"}
-                    {submission.match_count
-                      ? ` · ${submission.match_count} matches`
-                      : ""}
-                  </p>
-                </div>
-                <span
-                  className={cn(
-                    "shrink-0 font-mono text-[12px] font-[650]",
-                    submission.parse_error
-                      ? "text-[var(--linear-danger)]"
-                      : scoreTone(submission.flagged, submission.best_score),
-                  )}
-                >
-                  {submission.parse_error ? "error" : percent(submission.best_score)}
-                </span>
-              </div>
-              {submission.parse_error ? (
-                <p className="mt-2 text-[12px] leading-relaxed text-[var(--linear-danger)]">
-                  {submission.parse_error}
-                </p>
-              ) : null}
-            </div>
+              <td className="px-4 py-2.5 font-[560] text-[var(--foreground)]">
+                {studentLabel(submission.id)}
+              </td>
+              <td
+                className={cn(
+                  "px-4 py-2.5 text-right font-mono font-[650]",
+                  submission.parse_error
+                    ? "text-[var(--linear-danger)]"
+                    : scoreTone(submission.flagged, submission.best_score),
+                )}
+              >
+                {submission.parse_error ? "Error" : percent(submission.best_score)}
+              </td>
+              <td
+                className={cn(
+                  "px-4 py-2.5 text-right font-[560]",
+                  submission.parse_error || submission.flagged
+                    ? "text-[var(--linear-danger)]"
+                    : "text-[var(--chat-text-muted)]",
+                )}
+              >
+                {submission.parse_error ? "Error" : submission.flagged ? "Yes" : "No"}
+              </td>
+            </tr>
           ))}
-        </div>
-      ) : (
-        <EmptyReport>No AI detection flags reported.</EmptyReport>
-      )}
-    </>
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -304,17 +262,15 @@ export function ReportSection({
   kind: ReportKind;
   report: ToolReport | null;
 }) {
+  const sectionClass =
+    kind === "similarity" || kind === "aiDetection"
+      ? "no-scrollbar h-full min-h-0 overflow-auto pt-10 pb-10"
+      : "no-scrollbar h-full min-h-0 overflow-auto px-4 py-4 pb-10";
+
   return (
-    <section className="no-scrollbar h-full min-h-0 overflow-auto px-4 py-4 pb-10">
+    <section className={sectionClass}>
       {!report ? (
-        <>
-          <ReportHeader
-            assignmentName={null}
-            kind={kind}
-            sourceFile={null}
-          />
-          <EmptyReport>No report has been returned yet.</EmptyReport>
-        </>
+        <EmptyReport>No report has been returned yet.</EmptyReport>
       ) : kind === "similarity" ? (
         <SimilaritySection report={report} />
       ) : (

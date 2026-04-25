@@ -107,7 +107,10 @@ function followupReportFromPart(
 }
 
 function latestEventFromPart(part: UIMessage["parts"][number]) {
-  if (!isToolUIPart(part)) {
+  if (
+    !isToolUIPart(part) ||
+    (part.state !== "output-available" && part.state !== "output-error")
+  ) {
     return undefined;
   }
 
@@ -288,21 +291,15 @@ export function useGradingPanel(messages: UIMessage[]) {
       setPanelView(nextView);
       setPanelOpen(true);
     }, 0);
-    const initialRefreshTimeout = eventRunId
+    const runIdForRefresh =
+      latestEvent.kind !== "grading" ? eventRunId : null;
+    const refreshTimeout = runIdForRefresh
       ? window.setTimeout(() => {
-          void refreshPanelData(eventRunId);
+          void refreshPanelData(runIdForRefresh);
         }, 0)
-      : undefined;
-    const refreshTimeout = eventRunId
-      ? window.setTimeout(() => {
-          void refreshPanelData(eventRunId);
-        }, 1_500)
       : undefined;
     return () => {
       window.clearTimeout(openTimeout);
-      if (initialRefreshTimeout) {
-        window.clearTimeout(initialRefreshTimeout);
-      }
       if (refreshTimeout) {
         window.clearTimeout(refreshTimeout);
       }
