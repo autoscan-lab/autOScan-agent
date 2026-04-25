@@ -16,7 +16,7 @@ import {
   ScanSearchIcon,
   WrenchIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 
 import {
@@ -230,14 +230,7 @@ function stepActivity(step: ThoughtStep) {
 function AssistantThoughtTrail({ steps }: { steps: ThoughtStep[] }) {
   const anyActive = useMemo(() => steps.some(stepActivity), [steps]);
 
-  const [open, setOpen] = useState(anyActive);
-  const prevActive = useRef(anyActive);
-  useEffect(() => {
-    if (prevActive.current !== anyActive) {
-      prevActive.current = anyActive;
-      setOpen(anyActive);
-    }
-  }, [anyActive]);
+  const [open, setOpen] = useState(false);
 
   if (steps.length === 0) {
     return null;
@@ -525,7 +518,7 @@ export function ChatMessages({
     const isAssistant = message.role === "assistant";
     const showDitto = isAssistant && message.id === lastAssistantMessageId;
     const thoughtSteps = isAssistant ? extractThoughtSteps(message) : [];
-    const dittoActive = showDitto && (isModelBusy || thoughtSteps.some(stepActivity));
+    const dittoActive = showDitto && isModelBusy;
 
     return (
       <Message
