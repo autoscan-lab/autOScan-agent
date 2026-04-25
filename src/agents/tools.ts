@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { tool } from "@openai/agents";
 
 import type { UploadedAttachment } from "@/lib/chat/message-converters";
+import { runEngineGrade } from "@/lib/engine/client";
 import {
   studentsFromResult,
   type StudentRow,
@@ -11,7 +12,6 @@ import {
   getStoredFileByKey,
   saveGradingSession,
   saveUploadedFile,
-  type EngineResult,
   type StoredGradingSession,
   type StoredUpload,
   userStorageKey,
@@ -74,41 +74,6 @@ function pickStringArg(args: unknown, ...keys: string[]) {
   }
 
   return undefined;
-}
-
-const engineBaseUrl = () => {
-  const url = process.env.ENGINE_URL?.trim();
-  if (!url) {
-    throw new Error("ENGINE_URL is not configured.");
-  }
-  return url.replace(/\/$/, "");
-};
-
-const engineHeaders = () => {
-  const headers: Record<string, string> = {};
-  const secret = process.env.ENGINE_SECRET?.trim();
-
-  if (secret) {
-    headers.Authorization = `Bearer ${secret}`;
-    headers["X-Autoscan-Secret"] = secret;
-  }
-
-  return headers;
-};
-
-async function parseEngineResponse(response: Response) {
-  const contentType = response.headers.get("content-type") ?? "";
-  const payload = contentType.includes("application/json")
-    ? await response.json().catch(() => undefined)
-    : await response.text();
-
-  if (!response.ok) {
-    const detail =
-      typeof payload === "string" ? payload : JSON.stringify(payload ?? {});
-    throw new Error(`Engine request failed (${response.status}): ${detail}`);
-  }
-
-  return payload as EngineResult;
 }
 
 function contextUserId(userId?: string) {
@@ -212,46 +177,14 @@ async function attachmentToFile(
   return { bytes, filename, mediaType };
 }
 
-async function setupAssignment(assignmentName: string) {
-  return fetch(
-    `${engineBaseUrl()}/setup/${encodeURIComponent(assignmentName)}`,
-    {
-      headers: engineHeaders(),
-      method: "POST",
-      signal: AbortSignal.timeout(60_000),
-    },
-  );
-}
-
-async function gradeWithCurrentEngine(
-  assignmentName: string,
-  attachment: AttachmentFile,
-) {
-  const setupResponse = await setupAssignment(assignmentName);
-  await parseEngineResponse(setupResponse);
-
-  const formData = new FormData();
-  const blob = new Blob([new Uint8Array(attachment.bytes)], {
-    type: attachment.mediaType,
-  });
-  formData.set("file", blob, attachment.filename);
-
-  const response = await fetch(`${engineBaseUrl()}/grade`, {
-    body: formData,
-    headers: engineHeaders(),
-    method: "POST",
-    signal: AbortSignal.timeout(60_000),
-  });
-
-  return parseEngineResponse(response);
-}
-
-/** Drop fields that serialize to null so tool outputs stay lean for the LLM. */
+/** Keep streamed tool output small; the full run is loaded from R2 by run id. */
 function prune(row: StudentRow) {
   const entries = Object.entries(row).filter(
-    ([key, value]) => value !== null && key !== "sourceText",
+    ([key, value]) =>
+      value !== null &&
+      !["bannedHits", "sourceFiles", "sourceText", "tests"].includes(key),
   );
-  return Object.fromEntries(entries) as Partial<Omit<StudentRow, "sourceText">>;
+  return Object.fromEntries(entries) as Partial<StudentRow>;
 }
 
 export const gradeSubmissions = tool<
@@ -293,7 +226,7 @@ export const gradeSubmissions = tool<
         runId,
         userId,
       }));
-    const result = await gradeWithCurrentEngine(assignmentName, file);
+    const result = await runEngineGrade(assignmentName, file);
     const now = new Date().toISOString();
 
     await rememberSession(userId, {

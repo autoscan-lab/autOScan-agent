@@ -18,13 +18,24 @@ export type BannedHit = {
 };
 
 export type TestCaseResult = {
+  actualOutput: string | null;
+  diffLines: TestDiffLine[];
   durationMs: number | null;
   exitCode: number | null;
+  expectedOutput: string | null;
   index: number | null;
   message: string | null;
   name: string | null;
   outputMatch: string | null;
   status: string | null;
+  stderr: string | null;
+  stdout: string | null;
+};
+
+export type TestDiffLine = {
+  content: string;
+  lineNum: number | null;
+  type: string;
 };
 
 export type TestSummary = {
@@ -77,6 +88,10 @@ function bool(value: unknown): boolean | null {
   return typeof value === "boolean" ? value : null;
 }
 
+function record(value: unknown): Record<string, unknown> | null {
+  return isRecord(value) ? value : null;
+}
+
 function testsPassedOf(value: unknown): string | null {
   if (!isRecord(value)) {
     return null;
@@ -94,7 +109,8 @@ function stringArray(value: unknown): string[] {
 }
 
 function studentIdOf(raw: Record<string, unknown>): string {
-  return str(raw.student_id) ?? str(raw.id) ?? "unknown";
+  const submission = record(raw.submission);
+  return str(submission?.id) ?? "unknown";
 }
 
 function bannedHitsOf(value: unknown): BannedHit[] {
@@ -135,13 +151,43 @@ function testCasesOf(value: unknown): TestCaseResult[] {
 
     return [
       {
+        actualOutput: str(entry.actual_output),
+        diffLines: testDiffLinesOf(entry.diff_lines),
         durationMs: num(entry.duration_ms),
         exitCode: num(entry.exit_code),
+        expectedOutput: str(entry.expected_output),
         index: num(entry.index),
         message: str(entry.message),
         name: str(entry.name),
         outputMatch: str(entry.output_match),
         status: str(entry.status),
+        stderr: str(entry.stderr),
+        stdout: str(entry.stdout),
+      },
+    ];
+  });
+}
+
+function testDiffLinesOf(value: unknown): TestDiffLine[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((entry): TestDiffLine[] => {
+    if (!isRecord(entry)) {
+      return [];
+    }
+    const type = str(entry.type);
+    const content = str(entry.content);
+    if (!type || content === null) {
+      return [];
+    }
+
+    return [
+      {
+        content,
+        lineNum: num(entry.line_num),
+        type,
       },
     ];
   });
@@ -171,8 +217,8 @@ function sourceFilesOf(value: unknown): SourceFile[] {
     if (!isRecord(entry)) {
       return [];
     }
-    const content = str(entry.content) ?? str(entry.source_code);
-    const path = str(entry.path) ?? str(entry.file);
+    const content = str(entry.content);
+    const path = str(entry.name);
     if (!content || !path) {
       return [];
     }
@@ -181,10 +227,9 @@ function sourceFilesOf(value: unknown): SourceFile[] {
   });
 }
 
-function sourceTextOf(raw: Record<string, unknown>, sourceFiles: SourceFile[]) {
-  const sourceText = str(raw.source_code);
-  if (sourceText || sourceFiles.length === 0) {
-    return sourceText;
+function sourceTextOf(sourceFiles: SourceFile[]) {
+  if (sourceFiles.length === 0) {
+    return null;
   }
 
   return sourceFiles
@@ -197,22 +242,26 @@ function sourceTextOf(raw: Record<string, unknown>, sourceFiles: SourceFile[]) {
 }
 
 export function toStudentRow(raw: Record<string, unknown>): StudentRow {
+  const submission = record(raw.submission);
+  const compile = record(raw.compile);
+  const scan = record(raw.scan);
   const sourceFiles = sourceFilesOf(raw.source_files);
+  const bannedHits = bannedHitsOf(scan?.hits);
 
   return {
-    bannedCount: num(raw.banned_count),
-    bannedHits: bannedHitsOf(raw.banned_hits),
-    cFiles: stringArray(raw.c_files),
-    compileOk: bool(raw.compile_ok),
-    compileTimeMs: num(raw.compile_time_ms),
-    compileTimeout: bool(raw.compile_timeout),
-    compilerError: str(raw.stderr),
-    exitCode: num(raw.exit_code),
+    bannedCount: bannedHits.length,
+    bannedHits,
+    cFiles: stringArray(submission?.c_files),
+    compileOk: bool(compile?.ok),
+    compileTimeMs: num(compile?.duration_ms),
+    compileTimeout: bool(compile?.timed_out),
+    compilerError: str(compile?.stderr),
+    exitCode: num(compile?.exit_code),
     grade: num(raw.grade),
     notes: str(raw.notes),
-    path: str(raw.path),
+    path: str(submission?.path),
     sourceFiles,
-    sourceText: sourceTextOf(raw, sourceFiles),
+    sourceText: sourceTextOf(sourceFiles),
     status: str(raw.status),
     studentId: studentIdOf(raw),
     tests: testsOf(raw.tests),
