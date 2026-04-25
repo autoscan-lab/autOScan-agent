@@ -9,6 +9,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import { signOut } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -49,6 +50,7 @@ export function Chat({
   initialChatId,
   initialMessages,
   userEmail,
+  userImage,
   userName,
 }: ChatProps) {
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
@@ -201,84 +203,83 @@ export function Chat({
         />
       </div>
 
-      <header className="sticky top-0 z-20 border-b border-[var(--linear-border-subtle)] bg-[var(--chat-header-bg)] px-3 py-2.5 backdrop-blur-md md:px-5">
-        <div className="mx-auto flex w-full max-w-[1480px] items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <p className="font-heading text-[18px] font-[590] tracking-[-0.02em] text-[var(--foreground)]">
-              autOScan
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              aria-expanded={panelOpen}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[13px] font-[510] transition-colors",
-                panelOpen
-                  ? "border-[var(--linear-accent)]/40 bg-[var(--linear-accent)]/12 text-[var(--linear-accent-hover)]"
-                  : "border-[var(--linear-border-subtle)] bg-[var(--linear-ghost)] text-[var(--chat-text-secondary)] hover:border-[var(--linear-border)] hover:bg-[var(--linear-ghost-hover)] hover:text-[var(--foreground)]",
-              )}
-              onClick={() => setPanelOpen((value) => !value)}
-              type="button"
+      <header className="pointer-events-none fixed inset-x-0 top-0 z-40 px-3 py-1.5 md:px-4">
+        <div className="mx-auto flex w-full max-w-[1480px] items-center justify-between gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              aria-label="Account menu"
+              className="pointer-events-auto inline-flex size-7 items-center justify-center overflow-hidden rounded-full border border-[var(--linear-border-subtle)] bg-[var(--linear-ghost)] font-mono text-[10px] font-[510] text-[var(--chat-text-secondary)] shadow-[var(--shadow-dialog)] backdrop-blur-md transition-colors hover:border-[var(--linear-border)] hover:bg-[var(--linear-ghost-hover)] hover:text-[var(--foreground)]"
             >
-              {panelOpen ? (
-                <PanelRightCloseIcon className="size-3.5" />
+              {userImage ? (
+                <Image
+                  alt=""
+                  className="size-full object-cover"
+                  height={28}
+                  priority
+                  referrerPolicy="no-referrer"
+                  src={userImage}
+                  width={28}
+                />
               ) : (
-                <PanelRightOpenIcon className="size-3.5" />
+                initialsOf(displayName)
               )}
-              <span className="hidden sm:inline">Inspector</span>
-            </button>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                aria-label="Account menu"
-                className="inline-flex size-8 items-center justify-center rounded-full border border-[var(--linear-border-subtle)] bg-[var(--linear-ghost)] font-mono text-[11px] font-[510] text-[var(--chat-text-secondary)] transition-colors hover:border-[var(--linear-border)] hover:bg-[var(--linear-ghost-hover)] hover:text-[var(--foreground)]"
-              >
-                {initialsOf(displayName)}
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-60">
-                <div className="flex flex-col gap-0.5 px-2 pt-2 pb-1.5">
-                  <span className="text-[13px] font-[510] text-[var(--foreground)]">
-                    {userName || "Signed in"}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-60">
+              <div className="flex flex-col gap-0.5 px-2 pt-2 pb-1.5">
+                <span className="text-[13px] font-[510] text-[var(--foreground)]">
+                  {userName || "Signed in"}
+                </span>
+                {userEmail ? (
+                  <span className="truncate font-mono text-[11px] text-[var(--chat-text-muted)]">
+                    {userEmail}
                   </span>
-                  {userEmail ? (
-                    <span className="truncate font-mono text-[11px] text-[var(--chat-text-muted)]">
-                      {userEmail}
-                    </span>
-                  ) : null}
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  disabled={
-                    isModelBusy || isClearingHistory || messageList.length === 0
+                ) : null}
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                disabled={
+                  isModelBusy || isClearingHistory || messageList.length === 0
+                }
+                onClick={async () => {
+                  setIsClearingHistory(true);
+                  try {
+                    await clearHistory();
+                  } catch (clearError) {
+                    setRuntimeError(
+                      clearError instanceof Error
+                        ? clearError.message
+                        : "Could not clear chat history.",
+                    );
+                  } finally {
+                    setIsClearingHistory(false);
                   }
-                  onClick={async () => {
-                    setIsClearingHistory(true);
-                    try {
-                      await clearHistory();
-                    } catch (clearError) {
-                      setRuntimeError(
-                        clearError instanceof Error
-                          ? clearError.message
-                          : "Could not clear chat history.",
-                      );
-                    } finally {
-                      setIsClearingHistory(false);
-                    }
-                  }}
-                >
-                  <Trash2Icon />
-                  {isClearingHistory ? "Clearing..." : "Clear chat"}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => void signOut({ redirectTo: "/sign-in" })}
-                  variant="destructive"
-                >
-                  <LogOutIcon />
-                  Sign out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                }}
+              >
+                <Trash2Icon />
+                {isClearingHistory ? "Clearing..." : "Clear chat"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => void signOut({ redirectTo: "/sign-in" })}
+                variant="destructive"
+              >
+                <LogOutIcon />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <div>
+            {!panelOpen ? (
+              <button
+                aria-expanded={panelOpen}
+                aria-label="Open inspector"
+                className="pointer-events-auto inline-flex size-7 items-center justify-center rounded-md border border-[var(--linear-border-subtle)] bg-[var(--linear-ghost)] text-[var(--chat-text-secondary)] shadow-[var(--shadow-dialog)] backdrop-blur-md transition-colors hover:border-[var(--linear-border)] hover:bg-[var(--linear-ghost-hover)] hover:text-[var(--foreground)] md:hidden"
+                onClick={() => setPanelOpen(true)}
+                type="button"
+              >
+                <PanelRightOpenIcon className="size-3.5" />
+              </button>
+            ) : null}
           </div>
         </div>
       </header>
@@ -361,16 +362,32 @@ export function Chat({
         </section>
 
         <aside
-          aria-hidden={!panelOpen}
-          className={cn(
-            "pointer-events-none absolute inset-y-0 right-0 hidden w-[var(--inspector-w)] max-w-[680px] p-2 pl-0 transition-transform duration-[360ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none md:block",
-            panelOpen
-              ? "translate-x-0"
-              : "translate-x-[calc(100%+0.25rem)]",
-          )}
+          className="pointer-events-none fixed inset-y-0 right-0 z-50 hidden w-[var(--inspector-w)] max-w-[680px] p-2 pl-0 md:block"
           role="complementary"
         >
-          <div className="pointer-events-auto flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--linear-border)] bg-[var(--chat-panel)] shadow-[var(--shadow-dialog),var(--shadow-ring)]">
+          <button
+            aria-expanded={panelOpen}
+            aria-label={panelOpen ? "Close inspector" : "Open inspector"}
+            className="pointer-events-auto absolute right-3 top-3 z-20 inline-flex size-7 items-center justify-center rounded-md border border-[var(--linear-border)] bg-[#030304]/90 text-[var(--chat-text-secondary)] shadow-[var(--shadow-dialog)] backdrop-blur-md transition-colors hover:bg-[#08080a] hover:text-[var(--foreground)]"
+            onClick={() => setPanelOpen((value) => !value)}
+            type="button"
+          >
+            {panelOpen ? (
+              <PanelRightCloseIcon className="size-3.5" />
+            ) : (
+              <PanelRightOpenIcon className="size-3.5" />
+            )}
+          </button>
+
+          <div
+            aria-hidden={!panelOpen}
+            className={cn(
+              "pointer-events-auto flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--linear-border)] bg-[var(--chat-panel)] shadow-[var(--shadow-dialog),var(--shadow-ring)] transition-transform duration-[360ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+              panelOpen
+                ? "translate-x-0"
+                : "translate-x-[calc(100%+0.75rem)]",
+            )}
+          >
             {inspectorNode}
           </div>
         </aside>

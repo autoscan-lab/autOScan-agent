@@ -1,41 +1,89 @@
-import { ListChecksIcon } from "lucide-react";
+import { useMemo } from "react";
 
 import type { StudentInspectorRow } from "@/components/chat/support/types";
 import { cn } from "@/lib/utils";
-import { EmptyDetail, SectionLabel } from "./shared";
 
 export function TestsSection({ student }: { student: StudentInspectorRow }) {
+  const cases = useMemo(
+    () =>
+      [...(student.tests?.cases ?? [])].sort((a, b) => {
+        if (a.status === b.status) {
+          return (a.index ?? 0) - (b.index ?? 0);
+        }
+        if (a.status === "pass") {
+          return 1;
+        }
+        if (b.status === "pass") {
+          return -1;
+        }
+        return (a.index ?? 0) - (b.index ?? 0);
+      }),
+    [student.tests?.cases],
+  );
+
   return (
-    <section>
-      <div className="mb-3 flex items-center gap-2">
-        <ListChecksIcon className="size-4 text-[var(--chat-text-muted)]" />
-        <SectionLabel>Test details</SectionLabel>
-      </div>
-      {student.tests?.cases.length ? (
+    <section className="h-full min-h-0 overflow-auto px-4 py-4 pb-28">
+      {cases.length ? (
         <div className="space-y-2">
-          {student.tests.cases.map((testCase) => (
-            <div
-              className="flex items-center justify-between gap-3 rounded-md border border-[var(--linear-border-subtle)] bg-[var(--linear-ghost)] px-3 py-2 text-[13px]"
-              key={`${testCase.index}-${testCase.name}`}
-            >
-              <span className="min-w-0 truncate text-[var(--foreground)]">
-                {testCase.name ?? `Test ${testCase.index ?? ""}`}
-              </span>
-              <span
+          {cases.map((testCase) => {
+            const passed = testCase.status === "pass";
+            return (
+              <div
                 className={cn(
-                  "shrink-0 font-mono",
-                  testCase.status === "pass"
-                    ? "text-[var(--linear-success)]"
-                    : "text-[var(--linear-danger)]",
+                  "rounded-md border px-3 py-2 text-[13px]",
+                  passed
+                    ? "border-[var(--linear-border-subtle)] bg-transparent"
+                    : "border-[var(--linear-danger)]/25 bg-[var(--linear-danger)]/10",
                 )}
+                key={`${testCase.index}-${testCase.name}`}
               >
-                {testCase.status ?? "unknown"}
-              </span>
-            </div>
-          ))}
+                <div className="flex items-center justify-between gap-3">
+                  <span className="min-w-0 truncate text-[var(--foreground)]">
+                    {testCase.name ?? `Test ${testCase.index ?? ""}`}
+                  </span>
+                  <span
+                    className={cn(
+                      "shrink-0 font-mono",
+                      passed
+                        ? "text-[var(--linear-success)]"
+                        : "text-[var(--linear-danger)]",
+                    )}
+                  >
+                    {testCase.status ?? "unknown"}
+                  </span>
+                </div>
+                {!passed && testCase.message ? (
+                  <p className="mt-2 text-[12px] leading-relaxed text-[var(--chat-text-secondary)]">
+                    {testCase.message}
+                  </p>
+                ) : null}
+                {!passed && testCase.outputMatch ? (
+                  <p className="mt-1 font-mono text-[11px] text-[var(--chat-text-muted)]">
+                    output: {testCase.outputMatch}
+                  </p>
+                ) : null}
+                {!passed && (testCase.stderr || testCase.stdout) ? (
+                  <pre
+                    className={cn(
+                      "mt-2 max-h-36 overflow-auto rounded-sm border border-[var(--linear-border-subtle)] bg-[var(--linear-panel)] px-2 py-1.5 font-mono text-[11px] leading-relaxed",
+                      testCase.stderr
+                        ? "text-[var(--linear-danger)]"
+                        : "text-[var(--foreground)]",
+                    )}
+                  >
+                    {testCase.stderr || testCase.stdout}
+                  </pre>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       ) : (
-        <EmptyDetail>Detailed test inspection is coming soon.</EmptyDetail>
+        <div className="flex h-full items-center justify-center">
+          <p className="text-[13px] text-[var(--chat-text-muted)]">
+            No test details reported.
+          </p>
+        </div>
       )}
     </section>
   );

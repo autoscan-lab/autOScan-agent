@@ -13,6 +13,7 @@ export default async function Home() {
       initialChatId={chatState.chatId}
       initialMessages={chatState.messages}
       userEmail={session?.user?.email}
+      userImage={session?.user?.image}
       userName={session?.user?.name}
     />
   );

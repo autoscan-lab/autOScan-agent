@@ -5,6 +5,7 @@ export type ChatProps = {
   initialChatId?: string;
   initialMessages?: UIMessage[];
   userEmail?: string | null;
+  userImage?: string | null;
   userName?: string | null;
 };
 

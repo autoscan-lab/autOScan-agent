@@ -182,7 +182,20 @@ function prune(row: StudentRow) {
   const entries = Object.entries(row).filter(
     ([key, value]) =>
       value !== null &&
-      !["bannedHits", "sourceFiles", "sourceText", "tests"].includes(key),
+      ![
+        "bannedHits",
+        "cFiles",
+        "compileTimeMs",
+        "compileTimeout",
+        "compilerError",
+        "exitCode",
+        "notes",
+        "path",
+        "sourceFiles",
+        "sourceText",
+        "tests",
+        "testsPassed",
+      ].includes(key),
   );
   return Object.fromEntries(entries) as Partial<StudentRow>;
 }

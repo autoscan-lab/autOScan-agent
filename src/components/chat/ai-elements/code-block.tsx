@@ -92,13 +92,26 @@ const LINE_NUMBER_CLASSES = cn(
 
 // Line rendering component
 const LineSpan = ({
+  highlightedLine,
   keyedLine,
+  lineIdPrefix,
+  lineNumber,
   showLineNumbers,
 }: {
+  highlightedLine?: number;
   keyedLine: KeyedLine;
+  lineIdPrefix?: string;
+  lineNumber: number;
   showLineNumbers: boolean;
 }) => (
-  <span className={showLineNumbers ? LINE_NUMBER_CLASSES : "block"}>
+  <span
+    className={cn(
+      showLineNumbers ? LINE_NUMBER_CLASSES : "block",
+      highlightedLine === lineNumber && "bg-[var(--linear-accent)]/12",
+    )}
+    data-code-line={lineNumber}
+    id={lineIdPrefix ? `${lineIdPrefix}-${lineNumber}` : undefined}
+  >
     {keyedLine.tokens.length === 0
       ? "\n"
       : keyedLine.tokens.map(({ token, key }) => (
@@ -249,10 +262,14 @@ const CodeBlockBody = memo(
   ({
     tokenized,
     showLineNumbers,
+    highlightedLine,
+    lineIdPrefix,
     className,
   }: {
     tokenized: TokenizedCode;
     showLineNumbers: boolean;
+    highlightedLine?: number;
+    lineIdPrefix?: string;
     className?: string;
   }) => {
     const preStyle = useMemo(
@@ -282,10 +299,13 @@ const CodeBlockBody = memo(
             showLineNumbers && "[counter-increment:line_0] [counter-reset:line]"
           )}
         >
-          {keyedLines.map((keyedLine) => (
+          {keyedLines.map((keyedLine, index) => (
             <LineSpan
+              highlightedLine={highlightedLine}
               key={keyedLine.key}
               keyedLine={keyedLine}
+              lineIdPrefix={lineIdPrefix}
+              lineNumber={index + 1}
               showLineNumbers={showLineNumbers}
             />
           ))}
@@ -296,6 +316,8 @@ const CodeBlockBody = memo(
   (prevProps, nextProps) =>
     prevProps.tokenized === nextProps.tokenized &&
     prevProps.showLineNumbers === nextProps.showLineNumbers &&
+    prevProps.highlightedLine === nextProps.highlightedLine &&
+    prevProps.lineIdPrefix === nextProps.lineIdPrefix &&
     prevProps.className === nextProps.className
 );
 
@@ -373,11 +395,15 @@ export const CodeBlockActions = ({
 
 export const CodeBlockContent = ({
   code,
+  highlightedLine,
   language,
+  lineIdPrefix,
   showLineNumbers = false,
 }: {
   code: string;
+  highlightedLine?: number;
   language: BundledLanguage;
+  lineIdPrefix?: string;
   showLineNumbers?: boolean;
 }) => {
   // Memoized raw tokens for immediate display
@@ -417,7 +443,12 @@ export const CodeBlockContent = ({
 
   return (
     <div className="relative overflow-auto">
-      <CodeBlockBody showLineNumbers={showLineNumbers} tokenized={tokenized} />
+      <CodeBlockBody
+        highlightedLine={highlightedLine}
+        lineIdPrefix={lineIdPrefix}
+        showLineNumbers={showLineNumbers}
+        tokenized={tokenized}
+      />
     </div>
   );
 };

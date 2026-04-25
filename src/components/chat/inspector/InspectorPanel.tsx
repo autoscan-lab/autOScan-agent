@@ -1,15 +1,20 @@
 "use client";
 
-import { RefreshCwIcon } from "lucide-react";
-import { useMemo } from "react";
+import {
+  ChevronDownIcon,
+  RefreshCwIcon,
+} from "lucide-react";
+import { useMemo, useState } from "react";
 
 import type { GradingRunResponse } from "../support/types";
-import { BannedHitsSection } from "./BannedHitsSection";
-import { CompileSection } from "./CompileSection";
-import { MetricsGrid } from "./MetricsGrid";
-import { NotesSection } from "./NotesSection";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { SourceSection } from "./SourceSection";
-import { StudentHeader } from "./StudentHeader";
+import { StatusDrawer } from "./StatusDrawer";
 import { TestsSection } from "./TestsSection";
 
 export type InspectorPanelProps = {
@@ -18,6 +23,47 @@ export type InspectorPanelProps = {
   loading: boolean;
   selectedStudentId: string | null;
 };
+
+type InspectorView = "source" | "tests";
+
+function viewLabel(view: InspectorView) {
+  return view === "source" ? "Source" : "Tests";
+}
+
+function InspectorControls({
+  setView,
+  view,
+}: {
+  setView?: (view: InspectorView) => void;
+  view?: InspectorView;
+}) {
+  return (
+    <div className="absolute right-14 top-3 z-10 flex items-center gap-1.5">
+      {view && setView ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger className="inline-flex h-7 items-center gap-1.5 rounded-md border border-[var(--linear-border)] bg-[#030304]/90 px-2.5 text-[11px] font-[510] text-[var(--chat-text-secondary)] shadow-[var(--shadow-dialog)] backdrop-blur-md transition-colors hover:bg-[#08080a] hover:text-[var(--foreground)]">
+            {viewLabel(view)}
+            <ChevronDownIcon className="size-3" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            className="min-w-28 border border-[var(--linear-border)] bg-[#050506] text-[var(--foreground)]"
+          >
+            {(["source", "tests"] as InspectorView[]).map((value) => (
+              <DropdownMenuItem
+                className="text-[12px]"
+                key={value}
+                onClick={() => setView(value)}
+              >
+                {viewLabel(value)}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
+    </div>
+  );
+}
 
 export function InspectorPanel({
   data,
@@ -37,9 +83,16 @@ export function InspectorPanel({
   }, [students, selectedStudentId]);
 
   const hasStudents = students.length > 0;
+  const [highlightedLine, setHighlightedLine] = useState<number | null>(null);
+  const [view, setView] = useState<InspectorView>("source");
+
+  function revealSourceLine(line: number) {
+    setView("source");
+    setHighlightedLine(line);
+  }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="relative flex min-h-0 flex-1 flex-col">
       {error ? (
         <div className="mx-6 mt-5 rounded-md border border-[var(--linear-danger)]/35 bg-[var(--linear-danger)]/10 px-3 py-2 text-sm text-[var(--linear-danger)]">
           {error}
@@ -56,17 +109,30 @@ export function InspectorPanel({
           No grading results yet
         </div>
       ) : selectedStudent ? (
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
-          <div className="space-y-6">
-            <StudentHeader student={selectedStudent} />
-            <MetricsGrid student={selectedStudent} />
-            <CompileSection student={selectedStudent} />
-            <BannedHitsSection student={selectedStudent} />
-            <NotesSection student={selectedStudent} />
-            <SourceSection student={selectedStudent} />
-            <TestsSection student={selectedStudent} />
+        <>
+          <InspectorControls
+            setView={setView}
+            view={view}
+          />
+
+          <div className="min-h-0 flex-1 pb-14 pt-0">
+            {view === "source" ? (
+              <SourceSection
+                highlightedLine={highlightedLine}
+                student={selectedStudent}
+              />
+            ) : (
+              <TestsSection student={selectedStudent} />
+            )}
           </div>
-        </div>
+
+          <div className="absolute inset-x-0 bottom-0 z-10">
+            <StatusDrawer
+              onRevealLine={revealSourceLine}
+              student={selectedStudent}
+            />
+          </div>
+        </>
       ) : null}
     </div>
   );

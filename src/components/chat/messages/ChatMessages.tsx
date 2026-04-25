@@ -29,6 +29,7 @@ import {
   MessageContent,
   MessageResponse,
 } from "@/components/chat/ai-elements/message";
+import { formatStudentName } from "@/components/chat/support/display";
 import { cn } from "@/lib/utils";
 
 type ToolPart = ToolUIPart | DynamicToolUIPart;
@@ -50,6 +51,8 @@ type ChatMessagesProps = {
 };
 
 type GradingResultRow = {
+  bannedCount: number | null;
+  compileOk: boolean | null;
   grade: string;
   status: string;
   studentId: string;
@@ -268,6 +271,55 @@ function FileChip({ part }: { part: FileUIPart }) {
   );
 }
 
+function isFailedStatus(status: string) {
+  const normalized = status.toLowerCase();
+  return (
+    normalized.includes("fail") ||
+    normalized.includes("error") ||
+    normalized.includes("timed")
+  );
+}
+
+function rowState(row: GradingResultRow) {
+  if (row.compileOk === false || isFailedStatus(row.status)) {
+    return "failed";
+  }
+  if ((row.bannedCount ?? 0) > 0 || row.status.toLowerCase().includes("banned")) {
+    return "banned";
+  }
+  return "clean";
+}
+
+function rowStatusLabel(row: GradingResultRow) {
+  const state = rowState(row);
+  if (state === "failed") {
+    return "failed";
+  }
+  if (state === "banned") {
+    return "banned";
+  }
+  return "clean";
+}
+
+function rowStatusTone(row: GradingResultRow) {
+  const state = rowState(row);
+  if (state === "failed") {
+    return "text-[var(--linear-danger)]";
+  }
+  if (state === "banned") {
+    return "text-orange-300";
+  }
+  return "text-[var(--linear-success)]";
+}
+
+function rowGradeLabel(row: GradingResultRow) {
+  const state = rowState(row);
+  if (state === "failed" || state === "banned") {
+    return "2";
+  }
+  return "check later";
+}
+
 function extractGradingRows(part: ToolPart): GradingResultRow[] {
   if (!("output" in part) || !part.output || typeof part.output !== "object") {
     return [];
@@ -288,7 +340,17 @@ function extractGradingRows(part: ToolPart): GradingResultRow[] {
     }
     return [
       {
-        grade: typeof row.grade === "number" ? String(row.grade) : "-",
+        bannedCount:
+          typeof row.bannedCount === "number" ? row.bannedCount : null,
+        compileOk: typeof row.compileOk === "boolean" ? row.compileOk : null,
+        grade: rowGradeLabel({
+          bannedCount:
+            typeof row.bannedCount === "number" ? row.bannedCount : null,
+          compileOk: typeof row.compileOk === "boolean" ? row.compileOk : null,
+          grade: "",
+          status: typeof row.status === "string" ? row.status : "",
+          studentId,
+        }),
         status: typeof row.status === "string" ? row.status : "-",
         studentId,
       },
@@ -297,6 +359,7 @@ function extractGradingRows(part: ToolPart): GradingResultRow[] {
 }
 
 const gradingColumnTemplate = "minmax(10rem,1.6fr) minmax(6rem,1fr) minmax(6rem,1fr)";
+const gradingHeaders = ["Student", "status", "grade"];
 
 function GradingResultsTable({
   onSelectStudent,
@@ -319,7 +382,7 @@ function GradingResultsTable({
           className="grid border-b border-border bg-muted/70 text-sm"
           style={{ gridTemplateColumns: gradingColumnTemplate }}
         >
-          {["studentId", "status", "grade"].map((header) => (
+          {gradingHeaders.map((header) => (
             <div
               className="px-4 py-2.5 text-left font-semibold text-foreground"
               key={header}
@@ -345,10 +408,15 @@ function GradingResultsTable({
                 type="button"
               >
                 <span className="min-w-0 px-4 py-2.5 align-top text-foreground">
-                  {row.studentId}
+                  {formatStudentName(row.studentId)}
                 </span>
-                <span className="min-w-0 px-4 py-2.5 align-top text-[var(--chat-text-secondary)]">
-                  {row.status}
+                <span
+                  className={cn(
+                    "min-w-0 px-4 py-2.5 align-top font-[510]",
+                    rowStatusTone(row),
+                  )}
+                >
+                  {rowStatusLabel(row)}
                 </span>
                 <span className="min-w-0 px-4 py-2.5 align-top text-[var(--chat-text-secondary)]">
                   {row.grade}
