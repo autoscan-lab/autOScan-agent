@@ -52,14 +52,7 @@ export function usePersistentChat({
     if (messages.length === 0) {
       return;
     }
-    const persistable = messages.filter((msg) => {
-      const meta = msg.metadata;
-      if (typeof meta !== "object" || meta === null || Array.isArray(meta)) {
-        return true;
-      }
-      return !(meta as Record<string, unknown>).localAck;
-    });
-    void persistChatState(persistable).catch(() => {
+    void persistChatState(messages).catch(() => {
       // Keep the chat interactive even if persistence fails transiently.
     });
   }, [messages, persistChatState, status]);

@@ -48,6 +48,7 @@ type ChatMessagesProps = {
   messages: UIMessage[];
   onAssistantElapsedSettled?: (messageId: string, elapsedMs: number) => void;
   onSelectStudent?: (studentId: string) => void;
+  pendingAck?: string | null;
   selectedStudentId?: string | null;
   userName?: string | null;
 };
@@ -247,7 +248,8 @@ function AssistantThoughtTrail({
   isModelBusy: boolean;
   steps: ThoughtStep[];
 }) {
-  const anyActive = isModelBusy && useMemo(() => steps.some(stepActivity), [steps]);
+  const stepsActive = useMemo(() => steps.some(stepActivity), [steps]);
+  const anyActive = isModelBusy && stepsActive;
 
   const [open, setOpen] = useState(false);
 
@@ -514,6 +516,7 @@ export function ChatMessages({
   messages,
   onAssistantElapsedSettled,
   onSelectStudent,
+  pendingAck,
   selectedStudentId,
   userName,
 }: ChatMessagesProps) {
@@ -527,6 +530,9 @@ export function ChatMessages({
     return null;
   }, [messages]);
 
+  const lastMessageRole = messages[messages.length - 1]?.role;
+  const responseInFlight = lastMessageRole === "assistant";
+
   const welcomeBubble = (
     <Message className="max-w-full" from="assistant" key="welcome">
       <MessageContent className="w-full max-w-full gap-3">
@@ -537,7 +543,10 @@ export function ChatMessages({
 
   const messageNodes = messages.map((message) => {
     const isAssistant = message.role === "assistant";
-    const showDitto = isAssistant && message.id === lastAssistantMessageId;
+    const showDitto =
+      isAssistant &&
+      message.id === lastAssistantMessageId &&
+      responseInFlight;
     const thoughtSteps = isAssistant ? extractThoughtSteps(message) : [];
     const dittoActive = showDitto && isModelBusy;
 
@@ -598,10 +607,20 @@ export function ChatMessages({
     );
   });
 
+  const pendingAckNode = pendingAck ? (
+    <Message className="max-w-full" from="assistant" key="pending-ack">
+      <MessageContent className="w-full max-w-full gap-3">
+        <MessageResponse>{pendingAck}</MessageResponse>
+        {!responseInFlight ? <DittoThinking active={isModelBusy} /> : null}
+      </MessageContent>
+    </Message>
+  ) : null;
+
   return (
     <>
       {welcomeBubble}
       {messageNodes}
+      {pendingAckNode}
     </>
   );
 }

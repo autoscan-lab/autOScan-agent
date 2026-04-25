@@ -98,48 +98,6 @@ function ackTextForToolReadyTurn(
   return undefined;
 }
 
-function isLocalAckMessage(message: UIMessage) {
-  if (message.role !== "assistant" || typeof message.metadata !== "object") {
-    return false;
-  }
-  if (!message.metadata || Array.isArray(message.metadata)) {
-    return false;
-  }
-  return (message.metadata as Record<string, unknown>).localAck === true;
-}
-
-function insertAckAfterLatestUser(messages: UIMessage[], ackText: string) {
-  let latestUserIndex = -1;
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    if (messages[index]?.role === "user") {
-      latestUserIndex = index;
-      break;
-    }
-  }
-
-  if (latestUserIndex < 0) {
-    return messages;
-  }
-
-  const next = messages[latestUserIndex + 1];
-  if (next && isLocalAckMessage(next)) {
-    return messages;
-  }
-
-  const ackMessage: UIMessage = {
-    id: `ack-${crypto.randomUUID()}`,
-    metadata: { localAck: true },
-    parts: [{ state: "done", text: ackText, type: "text" }],
-    role: "assistant",
-  };
-
-  return [
-    ...messages.slice(0, latestUserIndex + 1),
-    ackMessage,
-    ...messages.slice(latestUserIndex + 1),
-  ];
-}
-
 function metadataRecord(message: UIMessage) {
   return typeof message.metadata === "object" &&
     message.metadata !== null &&
@@ -158,6 +116,7 @@ export function Chat({
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [isClearingHistory, setIsClearingHistory] = useState(false);
+  const [pendingAck, setPendingAck] = useState<string | null>(null);
 
   const { error, id, messages, sendMessage, setMessages, status, stop } =
     useChat({
@@ -226,6 +185,7 @@ export function Chat({
     setMessages([]);
     setRuntimeError(null);
     setAttachmentError(null);
+    setPendingAck(null);
     resetPanel();
     resetPersistenceDigest();
   }, [resetPanel, resetPersistenceDigest, setMessages]);
@@ -252,11 +212,7 @@ export function Chat({
           void sendMessage({ text: trimmedText });
         }
 
-        if (ackText) {
-          queueMicrotask(() => {
-            setMessages((current) => insertAckAfterLatestUser(current, ackText));
-          });
-        }
+        setPendingAck(ackText ?? null);
       } catch (submitError) {
         setAttachmentError(
           submitError instanceof Error
@@ -266,8 +222,17 @@ export function Chat({
         throw submitError;
       }
     },
-    [messageList, sendMessage, setMessages],
+    [messageList, sendMessage],
   );
+
+  useEffect(() => {
+    if (
+      pendingAck &&
+      messageList[messageList.length - 1]?.role === "assistant"
+    ) {
+      setPendingAck(null);
+    }
+  }, [messageList, pendingAck]);
 
   const handleAssistantElapsedSettled = useCallback(
     (messageId: string, elapsedMs: number) => {
@@ -452,6 +417,7 @@ export function Chat({
                 isModelBusy={isModelBusy}
                 messages={messageList}
                 onAssistantElapsedSettled={handleAssistantElapsedSettled}
+                pendingAck={pendingAck}
                 onSelectStudent={(studentId) => {
                   setSelectedStudentId(studentId);
                   setPanelView("source");
