@@ -29,7 +29,7 @@ export function SourceSection({
   return (
     <section className="h-full min-h-0">
       {student.sourceText ? (
-        <div className="no-scrollbar h-full overflow-auto bg-transparent pb-16 text-[12px] [&_code]:!text-[12px] [&_pre]:!m-0 [&_pre]:!bg-transparent [&_pre]:!p-3 [&_pre]:!leading-[1.55] [&_span]:!bg-transparent">
+        <div className="no-scrollbar h-full overflow-auto bg-transparent text-[12px] [&_code]:!text-[12px] [&_pre]:!m-0 [&_pre]:!bg-transparent [&_pre]:!p-3 [&_pre]:!leading-[1.55] [&_span]:!bg-transparent">
           <CodeBlockContent
             code={student.sourceText}
             highlightedLine={highlightedLine ?? undefined}

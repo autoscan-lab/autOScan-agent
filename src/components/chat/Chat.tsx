@@ -140,6 +140,14 @@ function insertAckAfterLatestUser(messages: UIMessage[], ackText: string) {
   ];
 }
 
+function metadataRecord(message: UIMessage) {
+  return typeof message.metadata === "object" &&
+    message.metadata !== null &&
+    !Array.isArray(message.metadata)
+    ? (message.metadata as Record<string, unknown>)
+    : {};
+}
+
 export function Chat({
   initialChatId,
   initialMessages,
@@ -255,6 +263,34 @@ export function Chat({
       }
     },
     [messageList, sendMessage, setMessages],
+  );
+
+  const handleAssistantElapsedSettled = useCallback(
+    (messageId: string, elapsedMs: number) => {
+      const roundedElapsedMs = Math.max(0, Math.round(elapsedMs));
+
+      setMessages((current) =>
+        current.map((message) => {
+          if (message.id !== messageId) {
+            return message;
+          }
+
+          const metadata = metadataRecord(message);
+          if (metadata.elapsedMs === roundedElapsedMs) {
+            return message;
+          }
+
+          return {
+            ...message,
+            metadata: {
+              ...metadata,
+              elapsedMs: roundedElapsedMs,
+            },
+          };
+        }),
+      );
+    },
+    [setMessages],
   );
 
   useEffect(() => {
@@ -389,27 +425,24 @@ export function Chat({
         className="relative z-10 flex min-h-0 flex-1 overflow-hidden"
         style={
           {
+            "--chat-column-w": "54rem",
             "--inspector-w": "min(36rem, 46vw)",
           } as React.CSSProperties
         }
       >
         <section
           className={cn(
-            "relative flex min-w-0 flex-1 flex-col transition-[margin-right,padding-right] duration-[360ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+            "relative flex min-w-0 flex-1 flex-col transition-[margin-right] duration-[360ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
             panelOpen ? "md:mr-[var(--inspector-w)]" : "md:mr-0",
           )}
-          style={{
-            paddingRight: panelOpen
-              ? "0px"
-              : "max(calc((100vw - 48rem) / 2 - 2rem), 0px)",
-          }}
         >
           <Conversation className="relative z-10 flex-1">
             <ConversationContent
-              className="mx-auto w-full max-w-3xl gap-6 px-3 pb-48 pt-6 md:mx-0 md:ml-auto md:mr-8 md:px-6"
+              className="mx-auto w-full max-w-[var(--chat-column-w)] gap-6 px-3 pb-44 pt-6 md:px-6"
             >
               <ChatMessages
                 messages={messageList}
+                onAssistantElapsedSettled={handleAssistantElapsedSettled}
                 onSelectStudent={(studentId) => {
                   setSelectedStudentId(studentId);
                   setPanelOpen(true);
@@ -434,15 +467,10 @@ export function Chat({
           </Conversation>
 
           <div
-            className="pointer-events-none absolute inset-x-0 bottom-0 z-10 transition-[padding-right] duration-[360ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
-            style={{
-              paddingRight: panelOpen
-                ? "0px"
-                : "max(calc((100vw - 48rem) / 2 - 2rem), 0px)",
-            }}
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-10"
           >
             <div className="px-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6 md:pb-5">
-              <div className="pointer-events-auto mx-auto w-full max-w-3xl md:mx-0 md:ml-auto md:mr-8">
+              <div className="pointer-events-auto mx-auto w-full max-w-[var(--chat-column-w)]">
                 {attachmentError ? (
                   <p className="mb-2 text-xs text-[var(--linear-danger)]">
                     {attachmentError}

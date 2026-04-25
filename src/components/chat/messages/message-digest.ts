@@ -25,7 +25,10 @@ export function messageDigest(messages: UIMessage[]) {
           return part.type;
         })
         .join(",");
-      return `${message.id}:${message.role}:${partDigest}`;
+      const metadataDigest = message.metadata
+        ? JSON.stringify(message.metadata)
+        : "";
+      return `${message.id}:${message.role}:${metadataDigest}:${partDigest}`;
     })
     .join("|");
 }

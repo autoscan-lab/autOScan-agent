@@ -24,8 +24,6 @@ import {
   ChainOfThought,
   ChainOfThoughtContent,
   ChainOfThoughtHeader,
-  ChainOfThoughtSearchResult,
-  ChainOfThoughtSearchResults,
   ChainOfThoughtStep,
 } from "@/components/chat/ai-elements/chain-of-thought";
 import {
@@ -46,14 +44,9 @@ type ThoughtStep =
   | { kind: "reasoning"; part: ReasoningUIPart }
   | { kind: "tool"; part: ToolPart };
 
-type ToolSummary = {
-  label: string;
-  description?: string;
-  chips: string[];
-};
-
 type ChatMessagesProps = {
   messages: UIMessage[];
+  onAssistantElapsedSettled?: (messageId: string, elapsedMs: number) => void;
   onSelectStudent?: (studentId: string) => void;
   selectedStudentId?: string | null;
   userName?: string | null;
@@ -62,7 +55,7 @@ type ChatMessagesProps = {
 type GradingResultRow = {
   bannedCount: number | null;
   compileOk: boolean | null;
-  grade: string;
+  grade: string | null;
   status: string;
   studentId: string;
 };
@@ -106,107 +99,96 @@ function iconForTool(toolName: string): LucideIcon {
   return toolIconMap[toolName] ?? WrenchIcon;
 }
 
-function summarizeTool(toolName: string, part: ToolPart): ToolSummary {
-  const input =
-    "input" in part && part.input && typeof part.input === "object"
-      ? (part.input as Record<string, unknown>)
-      : undefined;
-  const output =
-    "output" in part && part.output && typeof part.output === "object"
-      ? (part.output as Record<string, unknown>)
-      : undefined;
+function recordOf(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function messageMetadata(message: UIMessage) {
+  return recordOf(message.metadata);
+}
+
+function messageElapsedMs(message: UIMessage) {
+  const value = messageMetadata(message)?.elapsedMs;
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, Math.round(value))
+    : 0;
+}
+
+function stringOf(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : undefined;
+}
+
+function assignmentNameFromToolPart(part: ToolPart) {
+  const input = recordOf("input" in part ? part.input : undefined);
+  const output = recordOf("output" in part ? part.output : undefined);
+  return stringOf(input?.assignment_name) ?? stringOf(output?.assignmentName);
+}
+
+function toolStepLabel(toolName: string, part: ToolPart) {
   const isRunning =
     part.state === "input-streaming" || part.state === "input-available";
-  const outputMessage =
-    typeof output?.message === "string" && output.message.trim()
-      ? output.message.trim()
-      : undefined;
 
   switch (toolName) {
     case "check_similarity": {
-      if (isRunning) {
-        return { chips: [], label: "Calling check_similarity..." };
-      }
-      return {
-        chips: [],
-        description: outputMessage,
-        label: "check_similarity called",
-      };
+      return isRunning
+        ? "Calling check_similarity..."
+        : "Called check_similarity";
     }
 
     case "check_ai_detection": {
-      if (isRunning) {
-        return { chips: [], label: "Calling check_ai_detection..." };
-      }
-      return {
-        chips: [],
-        description: outputMessage,
-        label: "check_ai_detection called",
-      };
+      return isRunning
+        ? "Calling check_ai_detection..."
+        : "Called check_ai_detection";
     }
 
     case "grade_submissions": {
-      const assignment =
-        typeof input?.assignment_name === "string" && input.assignment_name.trim()
-          ? input.assignment_name.trim()
-          : typeof output?.assignmentName === "string" &&
-              output.assignmentName.trim()
-            ? output.assignmentName.trim()
-            : undefined;
-      const count =
-        typeof output?.studentCount === "number" &&
-        Number.isFinite(output.studentCount)
-          ? output.studentCount
-          : undefined;
-
-      if (isRunning) {
-        return {
-          chips: [],
-          label: assignment
-            ? `Calling grade_submissions(${assignment})...`
-            : "Calling grade_submissions...",
-        };
-      }
-
-      return {
-        chips: [],
-        description:
-          count !== undefined
-            ? `Finished ${count} submission${count === 1 ? "" : "s"}.`
-            : outputMessage,
-        label: assignment
-          ? `grade_submissions(${assignment}) called`
-          : "grade_submissions called",
-      };
+      const assignment = assignmentNameFromToolPart(part);
+      return `${isRunning ? "Calling" : "Called"} grade_submissions${
+        assignment ? `(${assignment})` : ""
+      }${isRunning ? "..." : ""}`;
     }
 
     default: {
-      return {
-        chips: [],
-        description: outputMessage,
-        label: isRunning
-          ? `Calling ${prettyToolTitle(toolName)}...`
-          : `${prettyToolTitle(toolName)} called`,
-      };
+      return isRunning
+        ? `Calling ${toolName}...`
+        : `Called ${prettyToolTitle(toolName)}`;
     }
   }
 }
 
+function thoughtTrailTitle(steps: ThoughtStep[]) {
+  for (const step of steps) {
+    if (step.kind !== "tool") {
+      continue;
+    }
+    const toolName = toolNameOf(step.part);
+    if (toolName === "grade_submissions") {
+      const assignment = assignmentNameFromToolPart(step.part);
+      return assignment ? `Grade ${assignment}` : "Grade submissions";
+    }
+    if (toolName === "check_similarity") {
+      return "Similarity";
+    }
+    if (toolName === "check_ai_detection") {
+      return "AI detection";
+    }
+    return prettyToolTitle(toolName);
+  }
+  return "Tool activity";
+}
+
 function ReasoningStepItem({ part }: { part: ReasoningUIPart }) {
   const isActive = part.state === "streaming";
-  const text = part.text?.trim();
   return (
     <ChainOfThoughtStep
       icon={BrainIcon}
       label={isActive ? "Calling tools..." : "Tools called"}
       status={isActive ? "active" : "complete"}
-    >
-      {text ? (
-        <div className="whitespace-pre-wrap rounded-md border border-[var(--linear-border-subtle)] bg-[var(--linear-ghost)] p-2.5 font-mono text-[11.5px] leading-[1.55] text-[var(--chat-text-muted)]">
-          {text}
-        </div>
-      ) : null}
-    </ChainOfThoughtStep>
+    />
   );
 }
 
@@ -216,13 +198,11 @@ function ToolStepItem({ part }: { part: ToolPart }) {
     part.state === "input-streaming" || part.state === "input-available";
   const isError = part.state === "output-error";
   const errorText = "errorText" in part ? part.errorText : undefined;
-  const summary = summarizeTool(toolName, part);
+  const label = toolStepLabel(toolName, part);
 
   return (
     <ChainOfThoughtStep
-      description={
-        isError ? (errorText ?? "Tool failed.") : summary.description
-      }
+      description={isError ? (errorText ?? "Tool failed.") : undefined}
       icon={iconForTool(toolName)}
       label={
         <span
@@ -231,24 +211,11 @@ function ToolStepItem({ part }: { part: ToolPart }) {
             isError && "text-[var(--linear-danger)]",
           )}
         >
-          {summary.label}
+          {label}
         </span>
       }
       status={isRunning ? "active" : "complete"}
-    >
-      {summary.chips.length > 0 ? (
-        <ChainOfThoughtSearchResults>
-          {summary.chips.map((chip) => (
-            <ChainOfThoughtSearchResult
-              className="border border-[var(--linear-border-subtle)] bg-[var(--linear-ghost)] text-[var(--chat-text-secondary)]"
-              key={chip}
-            >
-              {chip}
-            </ChainOfThoughtSearchResult>
-          ))}
-        </ChainOfThoughtSearchResults>
-      ) : null}
-    </ChainOfThoughtStep>
+    />
   );
 }
 
@@ -260,8 +227,7 @@ function stepActivity(step: ThoughtStep) {
   return state === "input-streaming" || state === "input-available";
 }
 
-function AssistantThoughtTrail({ message }: { message: UIMessage }) {
-  const steps = useMemo(() => extractThoughtSteps(message), [message]);
+function AssistantThoughtTrail({ steps }: { steps: ThoughtStep[] }) {
   const anyActive = useMemo(() => steps.some(stepActivity), [steps]);
 
   const [open, setOpen] = useState(anyActive);
@@ -277,23 +243,39 @@ function AssistantThoughtTrail({ message }: { message: UIMessage }) {
     return null;
   }
 
+  const visibleSteps = steps.some((step) => step.kind === "tool")
+    ? steps.filter((step) => step.kind === "tool")
+    : steps;
+  const title = thoughtTrailTitle(steps);
+  const statusText = anyActive ? "Calling tools..." : "Tools called";
+
   return (
     <ChainOfThought
       className="w-full space-y-3"
       onOpenChange={setOpen}
       open={open}
     >
-      <ChainOfThoughtHeader className="text-[var(--chat-text-muted)] hover:text-[var(--foreground)]" />
+      <ChainOfThoughtHeader
+        className="text-[var(--chat-text-muted)] hover:text-[var(--foreground)]"
+        leading={null}
+      >
+        <span className="flex min-w-0 flex-1 items-center gap-2 text-left">
+          <span className="max-w-[12rem] truncate rounded-md border border-[var(--linear-border-subtle)] bg-[var(--linear-ghost)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--chat-text-secondary)]">
+            {title}
+          </span>
+          <span className="truncate font-[510]">{statusText}</span>
+        </span>
+      </ChainOfThoughtHeader>
       <ChainOfThoughtContent className="ml-1 border-l border-[var(--linear-border-subtle)] pl-3">
-        {steps.map((step, index) =>
+        {visibleSteps.map((step, index) =>
           step.kind === "reasoning" ? (
             <ReasoningStepItem
-              key={`${message.id}-step-${index}`}
+              key={`step-${index}`}
               part={step.part}
             />
           ) : (
             <ToolStepItem
-              key={`${message.id}-step-${index}`}
+              key={`step-${index}`}
               part={step.part}
             />
           ),
@@ -334,8 +316,9 @@ function rowState(row: GradingResultRow) {
   return "clean";
 }
 
-function rowStatusLabel(row: GradingResultRow) {
-  const state = rowState(row);
+type RowState = ReturnType<typeof rowState>;
+
+function rowStatusLabel(state: RowState) {
   if (state === "failed") {
     return "failed";
   }
@@ -345,8 +328,7 @@ function rowStatusLabel(row: GradingResultRow) {
   return "clean";
 }
 
-function rowStatusTone(row: GradingResultRow) {
-  const state = rowState(row);
+function rowStatusTone(state: RowState) {
   if (state === "failed") {
     return "text-[var(--linear-danger)]";
   }
@@ -356,12 +338,48 @@ function rowStatusTone(row: GradingResultRow) {
   return "text-[var(--linear-success)]";
 }
 
-function rowGradeLabel(row: GradingResultRow) {
-  const state = rowState(row);
+function rowAccentTone(state: RowState) {
+  if (state === "failed") {
+    return "bg-[var(--linear-danger)]";
+  }
+  if (state === "banned") {
+    return "bg-orange-300";
+  }
+  return "bg-[var(--linear-success)]";
+}
+
+function gradeTone(grade: string) {
+  const numericGrade = Number.parseFloat(grade);
+  if (!Number.isFinite(numericGrade)) {
+    return "text-[var(--chat-text-secondary)]";
+  }
+  if (numericGrade >= 5 && numericGrade <= 10) {
+    return "text-[var(--linear-success)]";
+  }
+  if (numericGrade < 5) {
+    return "text-[var(--linear-danger)]";
+  }
+
+  return "text-[var(--chat-text-secondary)]";
+}
+
+function fallbackGradeLabel(state: RowState) {
   if (state === "failed" || state === "banned") {
     return "2";
   }
   return "check later";
+}
+
+function rowPresentation(row: GradingResultRow) {
+  const state = rowState(row);
+  const grade = row.grade ?? fallbackGradeLabel(state);
+  return {
+    accentTone: rowAccentTone(state),
+    grade,
+    gradeTone: gradeTone(grade),
+    statusLabel: rowStatusLabel(state),
+    statusTone: rowStatusTone(state),
+  };
 }
 
 function extractGradingRows(part: ToolPart): GradingResultRow[] {
@@ -382,23 +400,18 @@ function extractGradingRows(part: ToolPart): GradingResultRow[] {
     if (!studentId) {
       return [];
     }
-    return [
-      {
-        bannedCount:
-          typeof row.bannedCount === "number" ? row.bannedCount : null,
-        compileOk: typeof row.compileOk === "boolean" ? row.compileOk : null,
-        grade: rowGradeLabel({
-          bannedCount:
-            typeof row.bannedCount === "number" ? row.bannedCount : null,
-          compileOk: typeof row.compileOk === "boolean" ? row.compileOk : null,
-          grade: "",
-          status: typeof row.status === "string" ? row.status : "",
-          studentId,
-        }),
-        status: typeof row.status === "string" ? row.status : "-",
-        studentId,
-      },
-    ];
+    const resultRow: GradingResultRow = {
+      bannedCount: typeof row.bannedCount === "number" ? row.bannedCount : null,
+      compileOk: typeof row.compileOk === "boolean" ? row.compileOk : null,
+      grade:
+        typeof row.grade === "number" || typeof row.grade === "string"
+          ? String(row.grade)
+          : null,
+      status: typeof row.status === "string" ? row.status : "-",
+      studentId,
+    };
+
+    return [resultRow];
   });
 }
 
@@ -421,15 +434,15 @@ function GradingResultsTable({
   }
 
   return (
-    <div className="my-4 overflow-x-auto rounded-xl border border-border bg-card/40">
+    <div className="my-4 overflow-x-auto rounded-lg border border-[var(--linear-border)] bg-[var(--linear-panel)] shadow-[0_16px_44px_-28px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.03)]">
       <div className="min-w-full">
         <div
-          className="grid border-b border-border bg-muted/70 text-sm"
+          className="grid border-b border-[var(--linear-border-subtle)] bg-[var(--linear-ghost)] font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--chat-text-muted)]"
           style={{ gridTemplateColumns: gradingColumnTemplate }}
         >
           {gradingHeaders.map((header) => (
             <div
-              className="px-4 py-2.5 text-left font-semibold text-foreground"
+              className="px-4 py-2.5 text-left font-[510]"
               key={header}
             >
               {header}
@@ -440,11 +453,12 @@ function GradingResultsTable({
         <div>
           {rows.map((row) => {
             const active = row.studentId === selectedStudentId;
+            const presentation = rowPresentation(row);
             return (
               <button
                 aria-pressed={active}
                 className={cn(
-                  "grid w-full min-w-full border-b border-border text-left text-sm transition-colors last:border-b-0 hover:bg-muted/25 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--linear-accent)]",
+                  "group relative grid w-full min-w-full border-b border-[var(--linear-border-subtle)] text-left text-sm transition-colors last:border-b-0 hover:bg-[var(--linear-ghost-hover)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--linear-accent)]",
                   active && "bg-[var(--linear-accent)]/10",
                 )}
                 key={row.studentId}
@@ -452,19 +466,38 @@ function GradingResultsTable({
                 style={{ gridTemplateColumns: gradingColumnTemplate }}
                 type="button"
               >
-                <span className="min-w-0 px-4 py-2.5 align-top text-foreground">
-                  {formatStudentName(row.studentId)}
+                <span
+                  aria-hidden
+                  className={cn(
+                    "absolute left-0 top-2 bottom-2 w-px rounded-full opacity-60 transition-opacity group-hover:opacity-100",
+                    presentation.accentTone,
+                    active && "opacity-100",
+                  )}
+                />
+                <span className="min-w-0 px-4 py-2.5 align-top font-[510] text-foreground">
+                  <span className="truncate">
+                    {formatStudentName(row.studentId)}
+                  </span>
                 </span>
                 <span
                   className={cn(
                     "min-w-0 px-4 py-2.5 align-top font-[510]",
-                    rowStatusTone(row),
+                    presentation.statusTone,
                   )}
                 >
-                  {rowStatusLabel(row)}
+                  <span className="truncate">{presentation.statusLabel}</span>
                 </span>
-                <span className="min-w-0 px-4 py-2.5 align-top text-[var(--chat-text-secondary)]">
-                  {row.grade}
+                <span
+                  className={cn(
+                    "min-w-0 px-4 py-2.5 align-top font-mono text-[12px] font-[510]",
+                    presentation.gradeTone,
+                  )}
+                >
+                  <span
+                    className="truncate"
+                  >
+                    {presentation.grade}
+                  </span>
                 </span>
               </button>
             );
@@ -483,6 +516,7 @@ function buildWelcomeText(userName?: string | null) {
 
 export function ChatMessages({
   messages,
+  onAssistantElapsedSettled,
   onSelectStudent,
   selectedStudentId,
   userName,
@@ -508,8 +542,8 @@ export function ChatMessages({
   const messageNodes = messages.map((message) => {
     const isAssistant = message.role === "assistant";
     const showDitto = isAssistant && message.id === lastAssistantMessageId;
-    const dittoActive =
-      showDitto && extractThoughtSteps(message).some(stepActivity);
+    const thoughtSteps = isAssistant ? extractThoughtSteps(message) : [];
+    const dittoActive = showDitto && thoughtSteps.some(stepActivity);
 
     return (
       <Message
@@ -520,7 +554,7 @@ export function ChatMessages({
         <MessageContent
           className={cn("gap-3", isAssistant && "w-full max-w-full")}
         >
-          {isAssistant ? <AssistantThoughtTrail message={message} /> : null}
+          {isAssistant ? <AssistantThoughtTrail steps={thoughtSteps} /> : null}
           {message.parts.map((part, index) => {
             const key = `${message.id}-${index}`;
 
@@ -549,7 +583,15 @@ export function ChatMessages({
 
             return null;
           })}
-          {showDitto ? <DittoThinking active={dittoActive} /> : null}
+          {showDitto ? (
+            <DittoThinking
+              active={dittoActive}
+              initialElapsedMs={messageElapsedMs(message)}
+              onElapsedSettled={(elapsedMs) =>
+                onAssistantElapsedSettled?.(message.id, elapsedMs)
+              }
+            />
+          ) : null}
         </MessageContent>
       </Message>
     );

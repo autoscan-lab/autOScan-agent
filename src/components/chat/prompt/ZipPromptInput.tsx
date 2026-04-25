@@ -203,7 +203,7 @@ export function ZipPromptInput({
         ) : null}
 
         <textarea
-          className="field-sizing-content max-h-56 min-h-[84px] w-full resize-none bg-transparent px-4 py-3 text-[15px] leading-relaxed text-[var(--foreground)] outline-none placeholder:text-[var(--chat-text-muted)] focus-visible:ring-0 focus-visible:ring-offset-0"
+          className="field-sizing-content max-h-44 min-h-16 w-full resize-none bg-transparent px-4 py-2.5 text-[15px] leading-relaxed text-[var(--foreground)] outline-none placeholder:text-[var(--chat-text-muted)] focus-visible:ring-0 focus-visible:ring-offset-0"
           disabled={disabled}
           name="message"
           onChange={(event) => setText(event.currentTarget.value)}
@@ -221,7 +221,7 @@ export function ZipPromptInput({
           value={text}
         />
 
-        <div className="flex items-center justify-between gap-1 px-3 pb-2.5">
+        <div className="flex items-center justify-between gap-1 px-3 pb-2">
           <button
             aria-label="Attach zip"
             className="inline-flex size-8 items-center justify-center rounded-md text-[var(--chat-text-muted)] transition-colors hover:bg-[var(--linear-ghost-hover)] hover:text-[var(--foreground)] disabled:opacity-50"

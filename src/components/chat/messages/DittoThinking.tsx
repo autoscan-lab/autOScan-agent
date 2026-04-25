@@ -6,20 +6,19 @@ import { cn } from "@/lib/utils";
 
 type Verb = {
   active: string;
-  past: string;
 };
 
 const cyclingVerbs: Verb[] = [
-  { active: "Compiling", past: "Compiled" },
-  { active: "Testing", past: "Tested" },
-  { active: "Scanning", past: "Scanned" },
-  { active: "Reading", past: "Read" },
-  { active: "Checking", past: "Checked" },
-  { active: "Spotting", past: "Spotted" },
-  { active: "Crunching", past: "Crunched" },
-  { active: "Pondering", past: "Pondered" },
-  { active: "Cooking", past: "Cooked" },
-  { active: "Reviewing", past: "Reviewed" },
+  { active: "Compiling" },
+  { active: "Testing" },
+  { active: "Scanning" },
+  { active: "Reading" },
+  { active: "Checking" },
+  { active: "Spotting" },
+  { active: "Crunching" },
+  { active: "Pondering" },
+  { active: "Cooking" },
+  { active: "Reviewing" },
 ];
 
 const verbIntervalMs = 1800;
@@ -27,17 +26,22 @@ const frameCount = 8;
 const frameDurationMs = 100;
 const loopDurationMs = frameCount * frameDurationMs;
 
+function randomVerbIndex(exceptIndex?: number) {
+  if (cyclingVerbs.length <= 1) {
+    return 0;
+  }
+
+  let next = Math.floor(Math.random() * cyclingVerbs.length);
+  if (next === exceptIndex) {
+    next =
+      (next + 1 + Math.floor(Math.random() * (cyclingVerbs.length - 1))) %
+      cyclingVerbs.length;
+  }
+  return next;
+}
+
 function formatElapsed(ms: number) {
-  if (ms < 1000) {
-    return "<1s";
-  }
-  const totalSeconds = Math.round(ms / 1000);
-  if (totalSeconds < 60) {
-    return `${totalSeconds}s`;
-  }
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
+  return `${Math.round(ms)}ms`;
 }
 
 type DittoState = "looping" | "paused" | "playing-once";
@@ -77,37 +81,65 @@ function DittoSprite({
   );
 }
 
-export function DittoThinking({ active }: { active: boolean }) {
-  const [elapsedMs, setElapsedMs] = useState(0);
-  const [verbIndex, setVerbIndex] = useState(0);
-  const [lastVerbIndex, setLastVerbIndex] = useState(0);
+export function DittoThinking({
+  active,
+  initialElapsedMs = 0,
+  onElapsedSettled,
+}: {
+  active: boolean;
+  initialElapsedMs?: number;
+  onElapsedSettled?: (elapsedMs: number) => void;
+}) {
+  const [elapsedMs, setElapsedMs] = useState(initialElapsedMs);
+  const [verbIndex, setVerbIndex] = useState(() =>
+    active ? randomVerbIndex() : 0,
+  );
+  const [lastVerbIndex, setLastVerbIndex] = useState(() =>
+    active ? randomVerbIndex() : 0,
+  );
   const [pausedState, setPausedState] = useState<"paused" | "playing-once">(
     "paused",
   );
+  const elapsedMsRef = useRef(initialElapsedMs);
   const playOnceTimer = useRef<number | null>(null);
-  const wasActive = useRef(false);
+  const startedAt = useRef<number | null>(null);
+  const wasActive = useRef(active);
+  const reportedElapsed = useRef(!active);
 
   useEffect(() => {
     if (active && !wasActive.current) {
-      const randomIndex = Math.floor(Math.random() * cyclingVerbs.length);
+      const randomIndex = randomVerbIndex(lastVerbIndex);
       setVerbIndex(randomIndex);
       setLastVerbIndex(randomIndex);
+      elapsedMsRef.current = 0;
+      startedAt.current = Date.now();
+      setElapsedMs(0);
+      reportedElapsed.current = false;
+    }
+    if (!active && wasActive.current && !reportedElapsed.current) {
+      onElapsedSettled?.(elapsedMsRef.current);
+      reportedElapsed.current = true;
     }
     wasActive.current = active;
-  }, [active]);
+  }, [active, lastVerbIndex, onElapsedSettled]);
 
   useEffect(() => {
     if (!active) {
       return;
     }
 
-    const startedAt = Date.now() - elapsedMs;
+    if (startedAt.current === null) {
+      startedAt.current = Date.now() - elapsedMsRef.current;
+    }
+
     const id = window.setInterval(() => {
-      setElapsedMs(Date.now() - startedAt);
+      const nextElapsedMs = Date.now() - (startedAt.current ?? Date.now());
+      elapsedMsRef.current = nextElapsedMs;
+      setElapsedMs(nextElapsedMs);
     }, 250);
 
     return () => window.clearInterval(id);
-  }, [active, elapsedMs]);
+  }, [active]);
 
   useEffect(() => {
     if (!active) {
@@ -116,7 +148,7 @@ export function DittoThinking({ active }: { active: boolean }) {
 
     const id = window.setInterval(() => {
       setVerbIndex((value) => {
-        const next = (value + 1) % cyclingVerbs.length;
+        const next = randomVerbIndex(value);
         setLastVerbIndex(next);
         return next;
       });
@@ -173,13 +205,12 @@ export function DittoThinking({ active }: { active: boolean }) {
             )}
           </span>
         </span>
-        <span className="font-mono text-(--chat-text-muted)">...</span>
+        <span className="font-mono text-[var(--chat-text-muted)]">...</span>
       </span>
     );
   }
 
-  const lastVerb = cyclingVerbs[lastVerbIndex] ?? cyclingVerbs[0];
-  const label = `${lastVerb.past} for ${formatElapsed(elapsedMs)}`;
+  const label = formatElapsed(elapsedMs);
 
   return (
     <span className="flex items-center gap-2">
