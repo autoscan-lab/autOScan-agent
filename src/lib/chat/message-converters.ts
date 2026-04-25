@@ -25,6 +25,8 @@ type TextPart = {
 };
 
 type ToolPart = ToolUIPart | DynamicToolUIPart;
+const maxInputMessages = 24;
+const maxReplayTextChars = 2_000;
 
 function isTextPart(part: UIMessage["parts"][number]): part is TextPart {
   return part.type === "text";
@@ -40,13 +42,76 @@ function toolNameOf(part: ToolPart) {
     : part.type.replace(/^tool-/, "");
 }
 
+function recordOf(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function stringOf(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function htmlLikeText(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return normalized.startsWith("<!doctype html") || normalized.startsWith("<html");
+}
+
+function compactReplayText(value: string) {
+  if (!value.trim()) {
+    return "";
+  }
+
+  if (htmlLikeText(value)) {
+    return "[omitted html response]";
+  }
+
+  if (value.length <= maxReplayTextChars) {
+    return value;
+  }
+
+  return `${value.slice(0, maxReplayTextChars)}...[truncated]`;
+}
+
+function minimalToolOutput(part: ToolPart, toolName: string) {
+  const input = recordOf(part.input);
+  const output = recordOf("output" in part ? part.output : undefined);
+  const runId = stringOf(output?.runId) ?? stringOf(input?.run_id);
+  const assignmentName =
+    stringOf(output?.assignmentName) ?? stringOf(input?.assignment_name);
+
+  if (toolName === "grade_submissions" || toolName === "check_similarity") {
+    return {
+      assignmentName: assignmentName ?? null,
+      hasReport: toolName === "check_similarity" ? Boolean(output?.similarity) : true,
+      runId: runId ?? null,
+    };
+  }
+
+  if (toolName === "check_ai_detection") {
+    const detection =
+      recordOf(output?.aiDetection) ?? recordOf(output?.ai_detection);
+    return {
+      assignmentName: assignmentName ?? null,
+      hasReport: Boolean(detection),
+      runId: runId ?? null,
+    };
+  }
+
+  return {
+    assignmentName: assignmentName ?? null,
+    runId: runId ?? null,
+  };
+}
+
 export function extractUiMessageText(message: UIMessage) {
-  return (
+  const text =
     message.parts
       ?.filter(isTextPart)
       .map((part) => part.text)
-      .join("") ?? ""
-  );
+      .join("") ?? "";
+
+  return compactReplayText(text);
 }
 
 function describeFiles(message: UIMessage) {
@@ -80,13 +145,10 @@ export function extractLatestUserAttachments(
 
 export function toAgentInput(messages: UIMessage[]): AgentInputItem[] {
   const input: AgentInputItem[] = [];
+  const replayMessages = messages.filter((message) => message.role !== "system");
+  const boundedMessages = replayMessages.slice(-maxInputMessages);
 
-  for (const message of messages) {
-    // Never trust client-supplied system messages.
-    if (message.role === "system") {
-      continue;
-    }
-
+  for (const message of boundedMessages) {
     if (message.role === "assistant") {
       const toolParts = message.parts?.filter(isToolUIPart) ?? [];
 
@@ -106,7 +168,7 @@ export function toAgentInput(messages: UIMessage[]): AgentInputItem[] {
           callId: part.toolCallId,
           name: toolName,
           status: "completed",
-          output: JSON.stringify(part.output ?? null),
+          output: JSON.stringify(minimalToolOutput(part, toolName)),
         } as FunctionCallResultItem);
       }
 

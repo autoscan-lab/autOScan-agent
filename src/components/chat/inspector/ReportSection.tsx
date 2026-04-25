@@ -151,7 +151,7 @@ function SimilaritySection({ report }: { report: ToolReport }) {
   return (
     <div className="w-full overflow-x-auto">
       <table className="w-full border-collapse text-[12px]">
-        <thead className="sticky top-0 z-[1] bg-[#050506]/95 backdrop-blur">
+        <thead>
           <tr className="border-b border-[var(--linear-border)] font-mono uppercase tracking-[0.08em] text-[10px] text-[var(--chat-text-muted)]">
             <th className="px-4 py-2.5 text-left font-[510]">Student A</th>
             <th className="px-4 py-2.5 text-left font-[510]">Student B</th>
@@ -211,7 +211,7 @@ function AIDetectionSection({ report }: { report: ToolReport }) {
   return (
     <div className="w-full overflow-x-auto">
       <table className="w-full border-collapse text-[12px]">
-        <thead className="sticky top-0 z-[1] bg-[#050506]/95 backdrop-blur">
+        <thead>
           <tr className="border-b border-[var(--linear-border)] font-mono uppercase tracking-[0.08em] text-[10px] text-[var(--chat-text-muted)]">
             <th className="px-4 py-2.5 text-left font-[510]">Student</th>
             <th className="px-4 py-2.5 text-right font-[510]">AI score</th>
