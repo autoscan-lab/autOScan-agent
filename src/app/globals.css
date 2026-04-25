@@ -264,7 +264,7 @@
 
 /*
  * Ditto sprite animation. The strip lives at /ditto-strip.webp
- * (5 frames, 96px each, 480px total).
+ * (8 frames, 100px each, 800px total).
  *
  * Display sized via background-size to match the element box.
  * "Looping" plays forever; "playing-once" plays one cycle and then
@@ -272,12 +272,12 @@
  * holds the final frame so the ditto rests in place.
  */
 .ditto-sprite {
-  --ditto-frame: 20px;
+  --ditto-frame: 28px;
   width: var(--ditto-frame);
   height: var(--ditto-frame);
   background-image: url("/ditto-strip.webp");
   background-repeat: no-repeat;
-  background-size: calc(var(--ditto-frame) * 5) var(--ditto-frame);
+  background-size: calc(var(--ditto-frame) * 8) var(--ditto-frame);
   background-position: 0 0;
   image-rendering: pixelated;
   display: inline-block;
@@ -288,26 +288,26 @@
     background-position-x: 0;
   }
   to {
-    background-position-x: calc(var(--ditto-frame) * -4);
+    background-position-x: calc(var(--ditto-frame) * -7);
   }
 }
 
 .ditto-sprite--looping {
-  animation: ditto-loop 0.5s steps(5, jump-none) infinite;
+  animation: ditto-loop 0.8s steps(8, jump-none) infinite;
 }
 
 .ditto-sprite--playing-once {
-  animation: ditto-loop 0.5s steps(5, jump-none) 1 forwards;
+  animation: ditto-loop 0.8s steps(8, jump-none) 1 forwards;
 }
 
 .ditto-sprite--paused {
-  background-position-x: calc(var(--ditto-frame) * -4);
+  background-position-x: calc(var(--ditto-frame) * -7);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .ditto-sprite--looping,
   .ditto-sprite--playing-once {
     animation: none;
-    background-position-x: calc(var(--ditto-frame) * -4);
+    background-position-x: calc(var(--ditto-frame) * -7);
   }
 }

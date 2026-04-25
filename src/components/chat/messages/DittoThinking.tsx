@@ -11,19 +11,19 @@ type Verb = {
 
 const cyclingVerbs: Verb[] = [
   { active: "Compiling", past: "Compiled" },
-  { active: "Running tests", past: "Ran tests" },
-  { active: "Scanning code", past: "Scanned code" },
-  { active: "Reading source", past: "Read source" },
-  { active: "Looking at submissions", past: "Looked at submissions" },
-  { active: "Checking output", past: "Checked output" },
-  { active: "Spotting issues", past: "Spotted issues" },
-  { active: "Crunching numbers", past: "Crunched numbers" },
+  { active: "Testing", past: "Tested" },
+  { active: "Scanning", past: "Scanned" },
+  { active: "Reading", past: "Read" },
+  { active: "Checking", past: "Checked" },
+  { active: "Spotting", past: "Spotted" },
+  { active: "Crunching", past: "Crunched" },
   { active: "Pondering", past: "Pondered" },
   { active: "Cooking", past: "Cooked" },
+  { active: "Reviewing", past: "Reviewed" },
 ];
 
 const verbIntervalMs = 1800;
-const frameCount = 5;
+const frameCount = 8;
 const frameDurationMs = 100;
 const loopDurationMs = frameCount * frameDurationMs;
 
@@ -54,7 +54,7 @@ function DittoSprite({
     <span
       aria-hidden
       className={cn(
-        "ditto-sprite size-5 shrink-0",
+        "ditto-sprite shrink-0",
         state === "looping" && "ditto-sprite--looping",
         state === "playing-once" && "ditto-sprite--playing-once",
         state === "paused" && "ditto-sprite--paused",
@@ -77,45 +77,47 @@ function DittoSprite({
   );
 }
 
-export function DittoThinking({
-  active,
-  stepCount,
-}: {
-  active: boolean;
-  stepCount: number;
-}) {
-  const startedAtRef = useRef<number | null>(null);
-  const [elapsed, setElapsed] = useState<number | null>(null);
+export function DittoThinking({ active }: { active: boolean }) {
+  const [elapsedMs, setElapsedMs] = useState(0);
   const [verbIndex, setVerbIndex] = useState(0);
-  const lastVerbRef = useRef(0);
+  const [lastVerbIndex, setLastVerbIndex] = useState(0);
   const [pausedState, setPausedState] = useState<"paused" | "playing-once">(
     "paused",
   );
   const playOnceTimer = useRef<number | null>(null);
+  const wasActive = useRef(false);
 
   useEffect(() => {
-    if (active) {
-      if (startedAtRef.current === null) {
-        startedAtRef.current = Date.now();
-      }
-      setElapsed(null);
-      return;
+    if (active && !wasActive.current) {
+      const randomIndex = Math.floor(Math.random() * cyclingVerbs.length);
+      setVerbIndex(randomIndex);
+      setLastVerbIndex(randomIndex);
     }
-    if (startedAtRef.current !== null && elapsed === null) {
-      setElapsed(Date.now() - startedAtRef.current);
-    }
-  }, [active, elapsed]);
+    wasActive.current = active;
+  }, [active]);
 
   useEffect(() => {
     if (!active) {
       return;
     }
-    setVerbIndex(0);
-    lastVerbRef.current = 0;
+
+    const startedAt = Date.now() - elapsedMs;
+    const id = window.setInterval(() => {
+      setElapsedMs(Date.now() - startedAt);
+    }, 250);
+
+    return () => window.clearInterval(id);
+  }, [active, elapsedMs]);
+
+  useEffect(() => {
+    if (!active) {
+      return;
+    }
+
     const id = window.setInterval(() => {
       setVerbIndex((value) => {
         const next = (value + 1) % cyclingVerbs.length;
-        lastVerbRef.current = next;
+        setLastVerbIndex(next);
         return next;
       });
     }, verbIntervalMs);
@@ -171,16 +173,13 @@ export function DittoThinking({
             )}
           </span>
         </span>
-        <span className="font-mono text-[var(--chat-text-muted)]">...</span>
+        <span className="font-mono text-(--chat-text-muted)">...</span>
       </span>
     );
   }
 
-  const lastVerb = cyclingVerbs[lastVerbRef.current] ?? cyclingVerbs[0];
-  const label =
-    elapsed !== null
-      ? `${lastVerb.past} for ${formatElapsed(elapsed)}`
-      : `Thought through ${stepCount} step${stepCount === 1 ? "" : "s"}`;
+  const lastVerb = cyclingVerbs[lastVerbIndex] ?? cyclingVerbs[0];
+  const label = `${lastVerb.past} for ${formatElapsed(elapsedMs)}`;
 
   return (
     <span className="flex items-center gap-2">

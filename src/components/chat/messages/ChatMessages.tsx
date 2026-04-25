@@ -33,7 +33,10 @@ import {
   MessageContent,
   MessageResponse,
 } from "@/components/chat/ai-elements/message";
-import { firstNameOf, formatStudentName } from "@/components/chat/support/display";
+import {
+  firstNameOf,
+  formatStudentName,
+} from "@/components/chat/support/display";
 import { DittoThinking } from "@/components/chat/messages/DittoThinking";
 import { cn } from "@/lib/utils";
 
@@ -200,7 +203,9 @@ function ToolStepItem({ part }: { part: ToolPart }) {
 
   return (
     <ChainOfThoughtStep
-      description={isError ? errorText ?? "Tool failed." : summary.description}
+      description={
+        isError ? (errorText ?? "Tool failed.") : summary.description
+      }
       icon={iconForTool(toolName)}
       label={
         <span
@@ -252,7 +257,11 @@ function AssistantThoughtTrail({ message }: { message: UIMessage }) {
   }, [anyActive]);
 
   if (steps.length === 0) {
-    return null;
+    return (
+      <span className="flex items-center gap-2 text-[var(--chat-text-muted)]">
+        <DittoThinking active={false} />
+      </span>
+    );
   }
 
   return (
@@ -266,7 +275,7 @@ function AssistantThoughtTrail({ message }: { message: UIMessage }) {
         leading={null}
       >
         <span className="flex-1 text-left">
-          <DittoThinking active={anyActive} stepCount={steps.length} />
+          <DittoThinking active={anyActive} />
         </span>
       </ChainOfThoughtHeader>
       <ChainOfThoughtContent className="ml-1 border-l border-[var(--linear-border-subtle)] pl-3">
@@ -277,7 +286,10 @@ function AssistantThoughtTrail({ message }: { message: UIMessage }) {
               part={step.part}
             />
           ) : (
-            <ToolStepItem key={`${message.id}-step-${index}`} part={step.part} />
+            <ToolStepItem
+              key={`${message.id}-step-${index}`}
+              part={step.part}
+            />
           ),
         )}
       </ChainOfThoughtContent>
@@ -307,7 +319,10 @@ function rowState(row: GradingResultRow) {
   if (row.compileOk === false || isFailedStatus(row.status)) {
     return "failed";
   }
-  if ((row.bannedCount ?? 0) > 0 || row.status.toLowerCase().includes("banned")) {
+  if (
+    (row.bannedCount ?? 0) > 0 ||
+    row.status.toLowerCase().includes("banned")
+  ) {
     return "banned";
   }
   return "clean";
@@ -381,7 +396,8 @@ function extractGradingRows(part: ToolPart): GradingResultRow[] {
   });
 }
 
-const gradingColumnTemplate = "minmax(10rem,1.6fr) minmax(6rem,1fr) minmax(6rem,1fr)";
+const gradingColumnTemplate =
+  "minmax(10rem,1.6fr) minmax(6rem,1fr) minmax(6rem,1fr)";
 const gradingHeaders = ["Student", "status", "grade"];
 
 function GradingResultsTable({
@@ -475,11 +491,6 @@ export function ChatMessages({
 
   const messageNodes = messages.map((message) => {
     const isAssistant = message.role === "assistant";
-    const hasThoughts =
-      isAssistant &&
-      message.parts.some(
-        (part) => isReasoningUIPart(part) || isToolUIPart(part),
-      );
 
     return (
       <Message
@@ -490,7 +501,6 @@ export function ChatMessages({
         <MessageContent
           className={cn("gap-3", isAssistant && "w-full max-w-full")}
         >
-          {hasThoughts ? <AssistantThoughtTrail message={message} /> : null}
           {message.parts.map((part, index) => {
             const key = `${message.id}-${index}`;
 
@@ -519,6 +529,7 @@ export function ChatMessages({
 
             return null;
           })}
+          {isAssistant ? <AssistantThoughtTrail message={message} /> : null}
         </MessageContent>
       </Message>
     );
