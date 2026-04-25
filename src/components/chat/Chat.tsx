@@ -45,58 +45,6 @@ const PixelBlastBackground = dynamic(() => import("@/components/chat/PixelBlast"
 const chatWatchdogMs = 120_000;
 const maxZipUploadBytes = 12 * 1024 * 1024;
 const zipAcceptAttr = ".zip,application/zip,application/x-zip-compressed";
-const assignmentPattern = /\bS\d+\b/i;
-
-function latestRunId(messages: UIMessage[]) {
-  for (let messageIndex = messages.length - 1; messageIndex >= 0; messageIndex -= 1) {
-    const message = messages[messageIndex];
-    if (message.role !== "assistant") {
-      continue;
-    }
-
-    for (let partIndex = message.parts.length - 1; partIndex >= 0; partIndex -= 1) {
-      const part = message.parts[partIndex];
-      if (!("output" in part) || typeof part.output !== "object" || !part.output) {
-        continue;
-      }
-      const output = part.output as Record<string, unknown>;
-      const runId = output.runId;
-      if (typeof runId === "string" && runId.trim()) {
-        return runId.trim();
-      }
-    }
-  }
-
-  return undefined;
-}
-
-function ackTextForToolReadyTurn(
-  text: string,
-  files: FileUIPart[],
-  messages: UIMessage[],
-) {
-  const normalized = text.toLowerCase();
-  const hasAssignment = assignmentPattern.test(text);
-
-  if (files.length > 0 && hasAssignment) {
-    return "Got it, I have your zip and assignment. I'll run the grader now.";
-  }
-
-  const hasRunId = Boolean(latestRunId(messages));
-  if (hasRunId && normalized.includes("similar")) {
-    return "Got it, I'll run a similarity check now.";
-  }
-  if (
-    hasRunId &&
-    (normalized.includes("ai detect") ||
-      normalized.includes("ai detection") ||
-      normalized.includes("ai-generated"))
-  ) {
-    return "Got it, I'll run AI detection now.";
-  }
-
-  return undefined;
-}
 
 function metadataRecord(message: UIMessage) {
   return typeof message.metadata === "object" &&
@@ -116,7 +64,6 @@ export function Chat({
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [isClearingHistory, setIsClearingHistory] = useState(false);
-  const [pendingAck, setPendingAck] = useState<string | null>(null);
 
   const { error, id, messages, sendMessage, setMessages, status, stop } =
     useChat({
@@ -185,7 +132,6 @@ export function Chat({
     setMessages([]);
     setRuntimeError(null);
     setAttachmentError(null);
-    setPendingAck(null);
     resetPanel();
     resetPersistenceDigest();
   }, [resetPanel, resetPersistenceDigest, setMessages]);
@@ -202,7 +148,6 @@ export function Chat({
 
       try {
         const uploaded = message.files;
-        const ackText = ackTextForToolReadyTurn(trimmedText, uploaded, messageList);
 
         if (uploaded.length > 0 && trimmedText) {
           void sendMessage({ files: uploaded, text: trimmedText });
@@ -211,8 +156,6 @@ export function Chat({
         } else {
           void sendMessage({ text: trimmedText });
         }
-
-        setPendingAck(ackText ?? null);
       } catch (submitError) {
         setAttachmentError(
           submitError instanceof Error
@@ -222,17 +165,8 @@ export function Chat({
         throw submitError;
       }
     },
-    [messageList, sendMessage],
+    [sendMessage],
   );
-
-  useEffect(() => {
-    if (
-      pendingAck &&
-      messageList[messageList.length - 1]?.role === "assistant"
-    ) {
-      setPendingAck(null);
-    }
-  }, [messageList, pendingAck]);
 
   const handleAssistantElapsedSettled = useCallback(
     (messageId: string, elapsedMs: number) => {
@@ -417,7 +351,6 @@ export function Chat({
                 isModelBusy={isModelBusy}
                 messages={messageList}
                 onAssistantElapsedSettled={handleAssistantElapsedSettled}
-                pendingAck={pendingAck}
                 onSelectStudent={(studentId) => {
                   setSelectedStudentId(studentId);
                   setPanelView("source");

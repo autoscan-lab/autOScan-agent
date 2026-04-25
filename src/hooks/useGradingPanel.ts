@@ -15,9 +15,9 @@ type GradingRun = {
 };
 
 type LatestInspectorEvent =
-  | { kind: "grading"; toolCallId: string }
-  | { kind: "similarity"; toolCallId: string }
-  | { kind: "aiDetection"; toolCallId: string };
+  | { kind: "grading"; runId: string | null; toolCallId: string }
+  | { kind: "similarity"; runId: string | null; toolCallId: string }
+  | { kind: "aiDetection"; runId: string | null; toolCallId: string };
 
 type ToolReports = {
   aiDetectionReport: ToolReport | null;
@@ -31,6 +31,13 @@ function outputRecord(part: UIMessage["parts"][number]) {
     return undefined;
   }
   return part.output as Record<string, unknown>;
+}
+
+function inputRecord(part: UIMessage["parts"][number]) {
+  if (!("input" in part) || typeof part.input !== "object" || !part.input) {
+    return undefined;
+  }
+  return part.input as Record<string, unknown>;
 }
 
 function stringOf(value: unknown) {
@@ -68,6 +75,12 @@ function gradingRunFromPart(part: UIMessage["parts"][number]) {
   };
 }
 
+function followupRunIdFromPart(part: UIMessage["parts"][number]) {
+  const output = outputRecord(part);
+  const input = inputRecord(part);
+  return stringOf(output?.runId) ?? stringOf(input?.run_id) ?? stringOf(input?.runId);
+}
+
 function followupReportFromPart(
   part: UIMessage["parts"][number],
   expectedToolName: "check_similarity" | "check_ai_detection",
@@ -88,8 +101,43 @@ function followupReportFromPart(
   return {
     assignmentName: stringOf(output.assignmentName),
     payload: output[payloadField] ?? null,
-    runId: stringOf(output.runId),
+    runId: followupRunIdFromPart(part),
     toolCallId: part.toolCallId,
+  };
+}
+
+function latestEventFromPart(part: UIMessage["parts"][number]) {
+  if (!isToolUIPart(part)) {
+    return undefined;
+  }
+
+  const toolName = toolNameOf(part);
+  if (toolName === "check_similarity") {
+    return {
+      kind: "similarity" as const,
+      runId: followupRunIdFromPart(part),
+      toolCallId: part.toolCallId,
+    };
+  }
+  if (toolName === "check_ai_detection") {
+    return {
+      kind: "aiDetection" as const,
+      runId: followupRunIdFromPart(part),
+      toolCallId: part.toolCallId,
+    };
+  }
+
+  if (toolName !== "grade_submissions") {
+    return undefined;
+  }
+  const run = gradingRunFromPart(part);
+  if (!run) {
+    return undefined;
+  }
+  return {
+    kind: "grading" as const,
+    runId: run.runId,
+    toolCallId: run.toolCallId,
   };
 }
 
@@ -118,25 +166,19 @@ function scanToolReports(messages: UIMessage[]): ToolReports {
       const aiDetection: ToolReport | undefined = aiDetectionReport
         ? undefined
         : followupReportFromPart(part, "check_ai_detection", "aiDetection");
+      const event = latestEvent ? undefined : latestEventFromPart(part);
 
-      if (!latestEvent) {
-        if (aiDetection) {
-          latestEvent = {
-            kind: "aiDetection",
-            toolCallId: aiDetection.toolCallId,
-          };
-        } else if (similarity) {
-          latestEvent = {
-            kind: "similarity",
-            toolCallId: similarity.toolCallId,
-          };
-        } else if (run) {
-          latestEvent = { kind: "grading", toolCallId: run.toolCallId };
-        }
+      if (event) {
+        latestEvent = event;
       }
 
       if (run) {
         currentRun = run;
+      } else if (!currentRun && event?.runId) {
+        currentRun = {
+          runId: event.runId,
+          toolCallId: event.toolCallId,
+        };
       }
       if (similarity) {
         similarityReport = similarity;
@@ -235,18 +277,67 @@ export function useGradingPanel(messages: UIMessage[]) {
       return;
     }
     openedToolCallId.current = latestEvent.toolCallId;
+    const eventRunId = latestEvent.runId ?? currentRun?.runId ?? null;
     const nextView =
       latestEvent.kind === "similarity"
         ? "similarity"
         : latestEvent.kind === "aiDetection"
           ? "aiDetection"
           : "source";
-    const timeout = window.setTimeout(() => {
+    const openTimeout = window.setTimeout(() => {
       setPanelView(nextView);
       setPanelOpen(true);
     }, 0);
-    return () => window.clearTimeout(timeout);
-  }, [latestEvent?.kind, latestEvent?.toolCallId]);
+    const initialRefreshTimeout = eventRunId
+      ? window.setTimeout(() => {
+          void refreshPanelData(eventRunId);
+        }, 0)
+      : undefined;
+    const refreshTimeout = eventRunId
+      ? window.setTimeout(() => {
+          void refreshPanelData(eventRunId);
+        }, 1_500)
+      : undefined;
+    return () => {
+      window.clearTimeout(openTimeout);
+      if (initialRefreshTimeout) {
+        window.clearTimeout(initialRefreshTimeout);
+      }
+      if (refreshTimeout) {
+        window.clearTimeout(refreshTimeout);
+      }
+    };
+  }, [
+    currentRun?.runId,
+    latestEvent?.kind,
+    latestEvent?.runId,
+    latestEvent?.toolCallId,
+    refreshPanelData,
+  ]);
+
+  const fallbackSimilarityReport = useMemo<ToolReport | null>(() => {
+    if (panelData?.similarityReport === undefined || panelData?.similarityReport === null) {
+      return null;
+    }
+    return {
+      assignmentName: panelData.assignmentName,
+      payload: panelData.similarityReport,
+      runId: panelData.runId,
+      toolCallId: `stored:similarity:${panelData.runId ?? "unknown"}`,
+    };
+  }, [panelData]);
+
+  const fallbackAiDetectionReport = useMemo<ToolReport | null>(() => {
+    if (panelData?.aiDetectionReport === undefined || panelData?.aiDetectionReport === null) {
+      return null;
+    }
+    return {
+      assignmentName: panelData.assignmentName,
+      payload: panelData.aiDetectionReport,
+      runId: panelData.runId,
+      toolCallId: `stored:ai-detection:${panelData.runId ?? "unknown"}`,
+    };
+  }, [panelData]);
 
   const resetPanel = useCallback(() => {
     setPanelOpen(false);
@@ -260,7 +351,7 @@ export function useGradingPanel(messages: UIMessage[]) {
   }, []);
 
   return {
-    aiDetectionReport,
+    aiDetectionReport: aiDetectionReport ?? fallbackAiDetectionReport,
     panelData,
     panelError,
     panelLoading,
@@ -271,6 +362,6 @@ export function useGradingPanel(messages: UIMessage[]) {
     setPanelOpen,
     setSelectedStudentId,
     setPanelView,
-    similarityReport,
+    similarityReport: similarityReport ?? fallbackSimilarityReport,
   };
 }

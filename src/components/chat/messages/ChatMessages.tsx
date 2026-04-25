@@ -48,7 +48,6 @@ type ChatMessagesProps = {
   messages: UIMessage[];
   onAssistantElapsedSettled?: (messageId: string, elapsedMs: number) => void;
   onSelectStudent?: (studentId: string) => void;
-  pendingAck?: string | null;
   selectedStudentId?: string | null;
   userName?: string | null;
 };
@@ -129,10 +128,11 @@ function assignmentNameFromToolPart(part: ToolPart) {
   return stringOf(input?.assignment_name) ?? stringOf(output?.assignmentName);
 }
 
-function toolStepLabel(toolName: string, part: ToolPart) {
-  const isRunning =
-    part.state === "input-streaming" || part.state === "input-available";
-
+function toolStepLabel(
+  toolName: string,
+  isRunning: boolean,
+  assignment?: string,
+) {
   switch (toolName) {
     case "check_similarity": {
       return isRunning
@@ -147,7 +147,6 @@ function toolStepLabel(toolName: string, part: ToolPart) {
     }
 
     case "grade_submissions": {
-      const assignment = assignmentNameFromToolPart(part);
       return `${isRunning ? "Calling" : "Called"} grade_submissions${
         assignment ? `(${assignment})` : ""
       }${isRunning ? "..." : ""}`;
@@ -212,7 +211,11 @@ function ToolStepItem({
     (part.state === "input-streaming" || part.state === "input-available");
   const isError = part.state === "output-error";
   const errorText = "errorText" in part ? part.errorText : undefined;
-  const label = toolStepLabel(toolName, part);
+  const label = toolStepLabel(
+    toolName,
+    isRunning,
+    assignmentNameFromToolPart(part),
+  );
 
   return (
     <ChainOfThoughtStep
@@ -516,7 +519,6 @@ export function ChatMessages({
   messages,
   onAssistantElapsedSettled,
   onSelectStudent,
-  pendingAck,
   selectedStudentId,
   userName,
 }: ChatMessagesProps) {
@@ -607,20 +609,10 @@ export function ChatMessages({
     );
   });
 
-  const pendingAckNode = pendingAck ? (
-    <Message className="max-w-full" from="assistant" key="pending-ack">
-      <MessageContent className="w-full max-w-full gap-3">
-        <MessageResponse>{pendingAck}</MessageResponse>
-        {!responseInFlight ? <DittoThinking active={isModelBusy} /> : null}
-      </MessageContent>
-    </Message>
-  ) : null;
-
   return (
     <>
       {welcomeBubble}
       {messageNodes}
-      {pendingAckNode}
     </>
   );
 }

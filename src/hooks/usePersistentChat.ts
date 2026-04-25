@@ -3,8 +3,6 @@
 import type { ChatStatus, UIMessage } from "ai";
 import { useCallback, useEffect, useRef } from "react";
 
-import { messageDigest } from "@/components/chat/messages/message-digest";
-
 type UsePersistentChatInput = {
   chatId: string;
   initialMessages?: UIMessage[];
@@ -12,18 +10,22 @@ type UsePersistentChatInput = {
   status: ChatStatus;
 };
 
+const persistDebounceMs = 250;
+
 export function usePersistentChat({
   chatId,
   initialMessages,
   messages,
   status,
 }: UsePersistentChatInput) {
-  const lastPersistedDigest = useRef(messageDigest(initialMessages ?? []));
+  const lastPersistedMessagesRef = useRef(initialMessages ?? []);
 
   const persistChatState = useCallback(
     async (nextMessages: UIMessage[]) => {
-      const digest = messageDigest(nextMessages);
-      if (!digest || digest === lastPersistedDigest.current) {
+      if (nextMessages.length === 0) {
+        return;
+      }
+      if (nextMessages === lastPersistedMessagesRef.current) {
         return;
       }
 
@@ -40,7 +42,7 @@ export function usePersistentChat({
         throw new Error("Could not persist chat state.");
       }
 
-      lastPersistedDigest.current = digest;
+      lastPersistedMessagesRef.current = nextMessages;
     },
     [chatId],
   );
@@ -52,14 +54,18 @@ export function usePersistentChat({
     if (messages.length === 0) {
       return;
     }
-    void persistChatState(messages).catch(() => {
-      // Keep the chat interactive even if persistence fails transiently.
-    });
+    const timeout = window.setTimeout(() => {
+      void persistChatState(messages).catch(() => {
+        // Keep the chat interactive even if persistence fails transiently.
+      });
+    }, persistDebounceMs);
+
+    return () => window.clearTimeout(timeout);
   }, [messages, persistChatState, status]);
 
   return {
     resetPersistenceDigest: () => {
-      lastPersistedDigest.current = messageDigest([]);
+      lastPersistedMessagesRef.current = [];
     },
   };
 }

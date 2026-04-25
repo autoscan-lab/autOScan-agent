@@ -5,7 +5,13 @@ import {
   type FunctionCallItem,
   type FunctionCallResultItem,
 } from "@openai/agents";
-import type { DynamicToolUIPart, FileUIPart, UIMessage } from "ai";
+import {
+  isToolUIPart,
+  type DynamicToolUIPart,
+  type FileUIPart,
+  type ToolUIPart,
+  type UIMessage,
+} from "ai";
 
 export type UploadedAttachment = {
   filename?: string;
@@ -18,9 +24,7 @@ type TextPart = {
   text: string;
 };
 
-type UiMessageWithLegacyContent = UIMessage & {
-  content?: string;
-};
+type ToolPart = ToolUIPart | DynamicToolUIPart;
 
 function isTextPart(part: UIMessage["parts"][number]): part is TextPart {
   return part.type === "text";
@@ -30,24 +34,19 @@ function isFilePart(part: UIMessage["parts"][number]): part is FileUIPart {
   return part.type === "file";
 }
 
-function isDynamicToolPart(
-  part: UIMessage["parts"][number],
-): part is DynamicToolUIPart {
-  return part.type === "dynamic-tool";
+function toolNameOf(part: ToolPart) {
+  return part.type === "dynamic-tool"
+    ? part.toolName
+    : part.type.replace(/^tool-/, "");
 }
 
-export function extractUiMessageText(message: UiMessageWithLegacyContent) {
-  const text =
+export function extractUiMessageText(message: UIMessage) {
+  return (
     message.parts
       ?.filter(isTextPart)
       .map((part) => part.text)
-      .join("") ?? "";
-
-  if (text) {
-    return text;
-  }
-
-  return typeof message.content === "string" ? message.content : "";
+      .join("") ?? ""
+  );
 }
 
 function describeFiles(message: UIMessage) {
@@ -79,9 +78,7 @@ export function extractLatestUserAttachments(
   );
 }
 
-export function toAgentInput(
-  messages: UiMessageWithLegacyContent[],
-): AgentInputItem[] {
+export function toAgentInput(messages: UIMessage[]): AgentInputItem[] {
   const input: AgentInputItem[] = [];
 
   for (const message of messages) {
@@ -91,22 +88,23 @@ export function toAgentInput(
     }
 
     if (message.role === "assistant") {
-      const toolParts = message.parts?.filter(isDynamicToolPart) ?? [];
+      const toolParts = message.parts?.filter(isToolUIPart) ?? [];
 
       for (const part of toolParts) {
         if (part.state !== "output-available") continue;
+        const toolName = toolNameOf(part);
 
         input.push({
           type: "function_call",
           callId: part.toolCallId,
-          name: part.toolName,
+          name: toolName,
           arguments: JSON.stringify(part.input ?? {}),
         } as FunctionCallItem);
 
         input.push({
           type: "function_call_result",
           callId: part.toolCallId,
-          name: part.toolName,
+          name: toolName,
           status: "completed",
           output: JSON.stringify(part.output ?? null),
         } as FunctionCallResultItem);

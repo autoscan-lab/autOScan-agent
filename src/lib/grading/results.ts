@@ -68,9 +68,23 @@ export type StudentRow = {
 };
 
 export type GradingRunSummary = {
+  aiDetectionReport: unknown | null;
   assignmentName: string | null;
+  runId: string | null;
+  similarityReport: unknown | null;
   students: StudentRow[];
 };
+
+const similarityResultKeys = [
+  "similarity",
+  "similarity_report",
+  "similarityReport",
+] as const;
+const aiDetectionResultKeys = [
+  "ai_detection",
+  "aiDetection",
+  "ai_detection_report",
+] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -277,15 +291,40 @@ export function studentsFromResult(result: EngineResult | undefined): StudentRow
   return rows.filter(isRecord).map(toStudentRow);
 }
 
+function pickResultField(
+  result: EngineResult | undefined,
+  keys: readonly string[],
+) {
+  if (!result) {
+    return null;
+  }
+  for (const key of keys) {
+    const value = result[key];
+    if (value !== undefined && value !== null) {
+      return value;
+    }
+  }
+  return null;
+}
+
 export function gradingRunFromSession(
   session: StoredGradingSession | undefined,
 ): GradingRunSummary {
   if (!session) {
-    return { assignmentName: null, students: [] };
+    return {
+      aiDetectionReport: null,
+      assignmentName: null,
+      runId: null,
+      similarityReport: null,
+      students: [],
+    };
   }
 
   return {
+    aiDetectionReport: pickResultField(session.result, aiDetectionResultKeys),
     assignmentName: session.assignmentName ?? null,
+    runId: session.id ?? null,
+    similarityReport: pickResultField(session.result, similarityResultKeys),
     students: studentsFromResult(session.result),
   };
 }
