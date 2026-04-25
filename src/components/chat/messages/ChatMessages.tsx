@@ -106,244 +106,77 @@ function iconForTool(toolName: string): LucideIcon {
   return toolIconMap[toolName] ?? WrenchIcon;
 }
 
-function recordOf(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
-}
-
-function stringOf(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim().length > 0
-    ? value.trim()
-    : undefined;
-}
-
-function numberOf(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function numberFromKeys(
-  source: Record<string, unknown> | undefined,
-  keys: string[],
-) {
-  if (!source) {
-    return undefined;
-  }
-  for (const key of keys) {
-    const value = numberOf(source[key]);
-    if (value !== undefined) {
-      return value;
-    }
-  }
-  return undefined;
-}
-
-function lengthFromKeys(
-  source: Record<string, unknown> | undefined,
-  keys: string[],
-) {
-  if (!source) {
-    return undefined;
-  }
-  for (const key of keys) {
-    const value = source[key];
-    if (Array.isArray(value)) {
-      return value.length;
-    }
-  }
-  return undefined;
-}
-
-function chips(...values: Array<string | undefined>) {
-  return values.filter((value): value is string => Boolean(value));
-}
-
-function summarizeStudentStates(studentsValue: unknown) {
-  if (!Array.isArray(studentsValue)) {
-    return undefined;
-  }
-
-  let clean = 0;
-  let banned = 0;
-  let failed = 0;
-
-  for (const entry of studentsValue) {
-    const row = recordOf(entry);
-    if (!row) {
-      continue;
-    }
-
-    const status = stringOf(row.status) ?? "";
-    const compileOk =
-      typeof row.compileOk === "boolean" ? row.compileOk : undefined;
-    const bannedCount = numberOf(row.bannedCount) ?? 0;
-
-    if (compileOk === false || isFailedStatus(status)) {
-      failed += 1;
-      continue;
-    }
-    if (bannedCount > 0 || status.toLowerCase().includes("banned")) {
-      banned += 1;
-      continue;
-    }
-    clean += 1;
-  }
-
-  return { banned, clean, failed, total: studentsValue.length };
-}
-
-function similarityMetrics(value: unknown) {
-  if (Array.isArray(value)) {
-    return { pairCount: value.length, suspiciousCount: undefined as number | undefined };
-  }
-
-  const report = recordOf(value);
-  if (!report) {
-    return { pairCount: undefined, suspiciousCount: undefined };
-  }
-
-  const pairCount =
-    numberFromKeys(report, [
-      "pairCount",
-      "pairsCompared",
-      "totalPairs",
-      "comparisonCount",
-    ]) ??
-    lengthFromKeys(report, ["pairs", "comparisons", "results", "entries"]);
-
-  const suspiciousCount =
-    numberFromKeys(report, ["suspiciousPairs", "matchCount", "flaggedCount"]) ??
-    lengthFromKeys(report, ["suspicious", "matches", "flagged", "alerts"]);
-
-  return { pairCount, suspiciousCount };
-}
-
-function aiDetectionMetrics(value: unknown) {
-  if (Array.isArray(value)) {
-    return { flaggedCount: undefined as number | undefined, total: value.length };
-  }
-
-  const report = recordOf(value);
-  if (!report) {
-    return { flaggedCount: undefined, total: undefined };
-  }
-
-  const flaggedCount =
-    numberFromKeys(report, [
-      "flaggedCount",
-      "likelyAiCount",
-      "suspectedCount",
-      "highRiskCount",
-    ]) ??
-    lengthFromKeys(report, ["flagged", "suspected", "likely_ai", "highRisk"]);
-
-  const total =
-    numberFromKeys(report, ["total", "studentCount", "checkedCount", "analyzed"]) ??
-    lengthFromKeys(report, ["students", "results", "entries"]);
-
-  return { flaggedCount, total };
-}
-
 function summarizeTool(toolName: string, part: ToolPart): ToolSummary {
-  const input = recordOf("input" in part ? part.input : undefined);
-  const output = recordOf("output" in part ? part.output : undefined);
+  const input =
+    "input" in part && part.input && typeof part.input === "object"
+      ? (part.input as Record<string, unknown>)
+      : undefined;
+  const output =
+    "output" in part && part.output && typeof part.output === "object"
+      ? (part.output as Record<string, unknown>)
+      : undefined;
   const isRunning =
     part.state === "input-streaming" || part.state === "input-available";
-  const outputMessage = stringOf(output?.message);
-
-  if (outputMessage && !isRunning) {
-    return {
-      chips: [],
-      description: outputMessage,
-      label: `Completed ${toolName}`,
-    };
-  }
+  const outputMessage =
+    typeof output?.message === "string" && output.message.trim()
+      ? output.message.trim()
+      : undefined;
 
   switch (toolName) {
     case "check_similarity": {
-      const metrics = similarityMetrics(output?.similarity);
       if (isRunning) {
-        return {
-          chips: [],
-          label: "Running check_similarity...",
-        };
+        return { chips: [], label: "Calling check_similarity..." };
       }
       return {
-        chips: chips(
-          metrics.pairCount !== undefined ? `${metrics.pairCount} pairs` : undefined,
-          metrics.suspiciousCount !== undefined
-            ? `${metrics.suspiciousCount} flagged`
-            : undefined,
-        ),
-        description:
-          metrics.suspiciousCount !== undefined
-            ? metrics.suspiciousCount > 0
-              ? `Flagged ${metrics.suspiciousCount} likely copy pair${metrics.suspiciousCount === 1 ? "" : "s"}.`
-              : "No likely copy pairs flagged."
-            : metrics.pairCount !== undefined
-              ? `Compared ${metrics.pairCount} pair${metrics.pairCount === 1 ? "" : "s"}.`
-              : undefined,
-        label: "Completed check_similarity",
+        chips: [],
+        description: outputMessage,
+        label: "check_similarity called",
       };
     }
 
     case "check_ai_detection": {
-      const metrics = aiDetectionMetrics(output?.aiDetection);
       if (isRunning) {
-        return {
-          chips: [],
-          label: "Running check_ai_detection...",
-        };
+        return { chips: [], label: "Calling check_ai_detection..." };
       }
       return {
-        chips: chips(
-          metrics.total !== undefined ? `${metrics.total} checked` : undefined,
-          metrics.flaggedCount !== undefined
-            ? `${metrics.flaggedCount} flagged`
-            : undefined,
-        ),
-        description:
-          metrics.flaggedCount !== undefined
-            ? metrics.flaggedCount > 0
-              ? `Flagged ${metrics.flaggedCount} submission${metrics.flaggedCount === 1 ? "" : "s"} as likely AI-generated.`
-              : "No likely AI-generated submissions flagged."
-            : undefined,
-        label: "Completed check_ai_detection",
+        chips: [],
+        description: outputMessage,
+        label: "check_ai_detection called",
       };
     }
 
     case "grade_submissions": {
       const assignment =
-        stringOf(input?.assignment_name) ?? stringOf(output?.assignmentName);
-      const studentStates = summarizeStudentStates(output?.students);
-      const count = numberOf(output?.studentCount) ?? studentStates?.total;
-      const assignmentChip = assignment ? `assignment ${assignment}` : undefined;
+        typeof input?.assignment_name === "string" && input.assignment_name.trim()
+          ? input.assignment_name.trim()
+          : typeof output?.assignmentName === "string" &&
+              output.assignmentName.trim()
+            ? output.assignmentName.trim()
+            : undefined;
+      const count =
+        typeof output?.studentCount === "number" &&
+        Number.isFinite(output.studentCount)
+          ? output.studentCount
+          : undefined;
 
       if (isRunning) {
         return {
-          chips: chips(assignmentChip),
-          description:
-            "Setting up assignment, compiling submissions, running tests, and scanning banned functions.",
+          chips: [],
           label: assignment
-            ? `Running grade_submissions(${assignment})...`
-            : "Running grade_submissions...",
+            ? `Calling grade_submissions(${assignment})...`
+            : "Calling grade_submissions...",
         };
       }
 
       return {
-        chips: chips(
-          assignmentChip,
-          studentStates ? `${studentStates.clean} clean` : undefined,
-          studentStates ? `${studentStates.banned} banned` : undefined,
-          studentStates ? `${studentStates.failed} failed` : undefined,
-        ),
+        chips: [],
         description:
           count !== undefined
-            ? `Processed ${count} submission${count === 1 ? "" : "s"}.`
-            : undefined,
+            ? `Finished ${count} submission${count === 1 ? "" : "s"}.`
+            : outputMessage,
         label: assignment
-          ? `Completed grade_submissions(${assignment})`
-          : "Completed grade_submissions",
+          ? `grade_submissions(${assignment}) called`
+          : "grade_submissions called",
       };
     }
 
@@ -352,8 +185,8 @@ function summarizeTool(toolName: string, part: ToolPart): ToolSummary {
         chips: [],
         description: outputMessage,
         label: isRunning
-          ? `Running ${prettyToolTitle(toolName)}...`
-          : `Completed ${prettyToolTitle(toolName)}`,
+          ? `Calling ${prettyToolTitle(toolName)}...`
+          : `${prettyToolTitle(toolName)} called`,
       };
     }
   }
@@ -365,7 +198,7 @@ function ReasoningStepItem({ part }: { part: ReasoningUIPart }) {
   return (
     <ChainOfThoughtStep
       icon={BrainIcon}
-      label={isActive ? "Calling tools..." : "Tool reasoning"}
+      label={isActive ? "Calling tools..." : "Tools called"}
       status={isActive ? "active" : "complete"}
     >
       {text ? (
@@ -450,9 +283,7 @@ function AssistantThoughtTrail({ message }: { message: UIMessage }) {
       onOpenChange={setOpen}
       open={open}
     >
-      <ChainOfThoughtHeader className="text-[var(--chat-text-muted)] hover:text-[var(--foreground)]">
-        Tool activity
-      </ChainOfThoughtHeader>
+      <ChainOfThoughtHeader className="text-[var(--chat-text-muted)] hover:text-[var(--foreground)]" />
       <ChainOfThoughtContent className="ml-1 border-l border-[var(--linear-border-subtle)] pl-3">
         {steps.map((step, index) =>
           step.kind === "reasoning" ? (
@@ -689,6 +520,7 @@ export function ChatMessages({
         <MessageContent
           className={cn("gap-3", isAssistant && "w-full max-w-full")}
         >
+          {isAssistant ? <AssistantThoughtTrail message={message} /> : null}
           {message.parts.map((part, index) => {
             const key = `${message.id}-${index}`;
 
@@ -717,7 +549,6 @@ export function ChatMessages({
 
             return null;
           })}
-          {isAssistant ? <AssistantThoughtTrail message={message} /> : null}
           {showDitto ? <DittoThinking active={dittoActive} /> : null}
         </MessageContent>
       </Message>

@@ -38,7 +38,7 @@ function InspectorControls({
   view?: InspectorView;
 }) {
   return (
-    <div className="absolute right-11 top-[3px] z-10 flex items-center gap-2">
+    <div className="absolute right-10 top-[3px] z-10 flex items-center gap-2">
       {view && setView ? (
         <>
           <DropdownMenu>
@@ -63,7 +63,7 @@ function InspectorControls({
           </DropdownMenu>
           <span
             aria-hidden
-            className="hidden h-4 w-px bg-[var(--linear-border-subtle)]/80 md:block"
+            className="hidden h-5 w-px bg-[var(--linear-border)] md:block"
           />
         </>
       ) : null}
