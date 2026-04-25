@@ -4,7 +4,6 @@ import { useControllableState } from "@radix-ui/react-use-controllable-state";
 import { Badge } from "@/components/ui/badge";
 import {
   Collapsible,
-  CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
@@ -176,7 +175,7 @@ export const ChainOfThoughtSearchResult = memo(
 );
 
 export type ChainOfThoughtContentProps = ComponentProps<
-  typeof CollapsibleContent
+  "div"
 >;
 
 export const ChainOfThoughtContent = memo(
@@ -184,18 +183,21 @@ export const ChainOfThoughtContent = memo(
     const { isOpen } = useChainOfThought();
 
     return (
-      <Collapsible open={isOpen}>
-        <CollapsibleContent
-          className={cn(
-            "mt-2 space-y-3",
-            "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-popover-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in",
-            className
-          )}
-          {...props}
-        >
-          {children}
-        </CollapsibleContent>
-      </Collapsible>
+      <div
+        aria-hidden={!isOpen}
+        className={cn(
+          "grid text-popover-foreground transition-[grid-template-rows,opacity,margin-top,transform] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+          isOpen
+            ? "mt-2 grid-rows-[1fr] opacity-100"
+            : "mt-0 grid-rows-[0fr] -translate-y-1 opacity-0"
+        )}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className={cn("space-y-3", className)} {...props}>
+            {children}
+          </div>
+        </div>
+      </div>
     );
   }
 );

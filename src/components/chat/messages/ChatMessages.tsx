@@ -13,7 +13,6 @@ import {
   BotIcon,
   BrainIcon,
   FileArchiveIcon,
-  PlayIcon,
   ScanSearchIcon,
   WrenchIcon,
 } from "lucide-react";
@@ -92,7 +91,7 @@ function prettyToolTitle(toolName: string) {
 const toolIconMap: Record<string, LucideIcon> = {
   check_ai_detection: BotIcon,
   check_similarity: ScanSearchIcon,
-  grade_submissions: PlayIcon,
+  grade_submissions: WrenchIcon,
 };
 
 function iconForTool(toolName: string): LucideIcon {
@@ -338,16 +337,6 @@ function rowStatusTone(state: RowState) {
   return "text-[var(--linear-success)]";
 }
 
-function rowAccentTone(state: RowState) {
-  if (state === "failed") {
-    return "bg-[var(--linear-danger)]";
-  }
-  if (state === "banned") {
-    return "bg-orange-300";
-  }
-  return "bg-[var(--linear-success)]";
-}
-
 function gradeTone(grade: string) {
   const numericGrade = Number.parseFloat(grade);
   if (!Number.isFinite(numericGrade)) {
@@ -374,7 +363,6 @@ function rowPresentation(row: GradingResultRow) {
   const state = rowState(row);
   const grade = row.grade ?? fallbackGradeLabel(state);
   return {
-    accentTone: rowAccentTone(state),
     grade,
     gradeTone: gradeTone(grade),
     statusLabel: rowStatusLabel(state),
@@ -434,7 +422,7 @@ function GradingResultsTable({
   }
 
   return (
-    <div className="my-4 overflow-x-auto rounded-lg border border-[var(--linear-border)] bg-[var(--linear-panel)] shadow-[0_16px_44px_-28px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.03)]">
+    <div className="mt-2 overflow-x-auto rounded-lg border border-[var(--linear-border)] bg-[var(--linear-panel)] shadow-[0_16px_44px_-28px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.03)]">
       <div className="min-w-full">
         <div
           className="grid border-b border-[var(--linear-border-subtle)] bg-[var(--linear-ghost)] font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--chat-text-muted)]"
@@ -466,14 +454,6 @@ function GradingResultsTable({
                 style={{ gridTemplateColumns: gradingColumnTemplate }}
                 type="button"
               >
-                <span
-                  aria-hidden
-                  className={cn(
-                    "absolute left-0 top-2 bottom-2 w-px rounded-full opacity-60 transition-opacity group-hover:opacity-100",
-                    presentation.accentTone,
-                    active && "opacity-100",
-                  )}
-                />
                 <span className="min-w-0 px-4 py-2.5 align-top font-[510] text-foreground">
                   <span className="truncate">
                     {formatStudentName(row.studentId)}

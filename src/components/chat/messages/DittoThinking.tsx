@@ -6,19 +6,20 @@ import { cn } from "@/lib/utils";
 
 type Verb = {
   active: string;
+  past: string;
 };
 
 const cyclingVerbs: Verb[] = [
-  { active: "Compiling" },
-  { active: "Testing" },
-  { active: "Scanning" },
-  { active: "Reading" },
-  { active: "Checking" },
-  { active: "Spotting" },
-  { active: "Crunching" },
-  { active: "Pondering" },
-  { active: "Cooking" },
-  { active: "Reviewing" },
+  { active: "Compiling", past: "Compiled" },
+  { active: "Testing", past: "Tested" },
+  { active: "Scanning", past: "Scanned" },
+  { active: "Reading", past: "Read" },
+  { active: "Checking", past: "Checked" },
+  { active: "Spotting", past: "Spotted" },
+  { active: "Crunching", past: "Crunched" },
+  { active: "Pondering", past: "Pondered" },
+  { active: "Cooking", past: "Cooked" },
+  { active: "Reviewing", past: "Reviewed" },
 ];
 
 const verbIntervalMs = 1800;
@@ -41,7 +42,19 @@ function randomVerbIndex(exceptIndex?: number) {
 }
 
 function formatElapsed(ms: number) {
-  return `${Math.round(ms)}ms`;
+  const roundedMs = Math.max(0, Math.round(ms));
+  if (roundedMs < 1000) {
+    return `${roundedMs}ms`;
+  }
+
+  const totalSeconds = Math.round(roundedMs / 1000);
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s`;
+  }
+
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
 }
 
 type DittoState = "looping" | "paused" | "playing-once";
@@ -91,12 +104,8 @@ export function DittoThinking({
   onElapsedSettled?: (elapsedMs: number) => void;
 }) {
   const [elapsedMs, setElapsedMs] = useState(initialElapsedMs);
-  const [verbIndex, setVerbIndex] = useState(() =>
-    active ? randomVerbIndex() : 0,
-  );
-  const [lastVerbIndex, setLastVerbIndex] = useState(() =>
-    active ? randomVerbIndex() : 0,
-  );
+  const [verbIndex, setVerbIndex] = useState(() => randomVerbIndex());
+  const [lastVerbIndex, setLastVerbIndex] = useState(() => randomVerbIndex());
   const [pausedState, setPausedState] = useState<"paused" | "playing-once">(
     "paused",
   );
@@ -180,9 +189,9 @@ export function DittoThinking({
 
   if (active) {
     return (
-      <span className="flex items-center gap-2">
+      <span className="flex items-center gap-2 overflow-visible leading-none">
         <DittoSprite state="looping" />
-        <span className="relative inline-flex h-[1.2em] overflow-hidden">
+        <span className="relative -my-1 inline-flex h-[1.6em] overflow-hidden px-0.5 py-1 leading-[1.35]">
           {cyclingVerbs.map((verb, index) => (
             <span
               aria-hidden={index !== verbIndex}
@@ -210,10 +219,11 @@ export function DittoThinking({
     );
   }
 
-  const label = formatElapsed(elapsedMs);
+  const lastVerb = cyclingVerbs[lastVerbIndex] ?? cyclingVerbs[0];
+  const label = `${lastVerb.past} ${formatElapsed(elapsedMs)}`;
 
   return (
-    <span className="flex items-center gap-2">
+    <span className="flex items-center gap-2 overflow-visible">
       <DittoSprite onClick={poke} state={pausedState} />
       <span className="font-[510]">{label}</span>
     </span>
