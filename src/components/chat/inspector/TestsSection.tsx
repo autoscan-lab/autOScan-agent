@@ -22,7 +22,7 @@ export function TestsSection({ student }: { student: StudentInspectorRow }) {
   );
 
   return (
-    <section className="h-full min-h-0 overflow-auto px-4 py-4 pb-28">
+    <section className="no-scrollbar h-full min-h-0 overflow-auto px-4 py-4 pb-28">
       {cases.length ? (
         <div className="space-y-2">
           {cases.map((testCase) => {

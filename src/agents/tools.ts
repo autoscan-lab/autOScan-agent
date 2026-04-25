@@ -3,12 +3,16 @@ import { randomUUID } from "node:crypto";
 import { tool } from "@openai/agents";
 
 import type { UploadedAttachment } from "@/lib/chat/message-converters";
-import { runEngineGrade } from "@/lib/engine/client";
+import {
+  type EngineGradeOptions,
+  runEngineGrade,
+} from "@/lib/engine/client";
 import {
   studentsFromResult,
   type StudentRow,
 } from "@/lib/grading";
 import {
+  getGradingSession,
   getStoredFileByKey,
   saveGradingSession,
   saveUploadedFile,
@@ -51,6 +55,19 @@ const gradeSubmissionsSchema: NonStrictToolSchema = {
     },
   },
   required: ["assignment_name"],
+  type: "object",
+};
+
+const followupSchema: NonStrictToolSchema = {
+  additionalProperties: true,
+  properties: {
+    run_id: {
+      description:
+        "The runId returned by a previous grade_submissions call in this conversation.",
+      type: "string",
+    },
+  },
+  required: ["run_id"],
   type: "object",
 };
 
@@ -259,6 +276,125 @@ export const gradeSubmissions = tool<
       students: students.map(prune),
     };
   },
+  timeoutBehavior: "error_as_result",
+  timeoutMs: 240_000,
+});
+
+async function loadSessionUpload(userId: string, runId: string) {
+  const session = await getGradingSession(userId, runId);
+  if (!session) {
+    return { error: "Run not found. Ask the user which run to inspect." } as const;
+  }
+
+  const upload = session.uploads[0];
+  if (!upload) {
+    return { error: "Stored run has no upload to re-analyze." } as const;
+  }
+
+  const stored = await getStoredFileByKey(upload.key);
+  if (!stored) {
+    return {
+      error:
+        "The original zip is no longer available. Ask the user to re-upload it.",
+    } as const;
+  }
+
+  return {
+    file: {
+      bytes: stored.bytes,
+      filename: upload.filename,
+      mediaType: stored.contentType ?? upload.contentType ?? "application/zip",
+    },
+    session,
+  } as const;
+}
+
+function pickFollowupResult(
+  result: Record<string, unknown>,
+  ...keys: string[]
+): unknown {
+  for (const key of keys) {
+    const value = result[key];
+    if (value !== undefined && value !== null) {
+      return value;
+    }
+  }
+  return null;
+}
+
+async function runFollowup(
+  args: unknown,
+  runContext: { context: GradingContext } | undefined,
+  options: EngineGradeOptions,
+  payloadKeys: string[],
+  payloadField: string,
+) {
+  const runId = pickStringArg(args, "run_id");
+  if (!runId) {
+    return {
+      message:
+        "Missing run_id. Use the runId from the previous grade_submissions call.",
+    };
+  }
+
+  const userId = contextUserId(runContext?.context.userId);
+  const loaded = await loadSessionUpload(userId, runId);
+  if ("error" in loaded) {
+    return { message: loaded.error };
+  }
+
+  const result = (await runEngineGrade(
+    loaded.session.assignmentName,
+    loaded.file,
+    options,
+  )) as Record<string, unknown>;
+
+  const now = new Date().toISOString();
+  await rememberSession(userId, {
+    ...loaded.session,
+    result,
+    updatedAt: now,
+  });
+
+  return {
+    [payloadField]: pickFollowupResult(result, ...payloadKeys),
+    assignmentName: loaded.session.assignmentName,
+    runId,
+  };
+}
+
+export const checkSimilarity = tool<typeof followupSchema, GradingContext>({
+  description:
+    "Check pairwise similarity across submissions in a previously graded run to spot potential copies.",
+  name: "check_similarity",
+  parameters: followupSchema,
+  strict: false,
+  execute: async (args, runContext) =>
+    runFollowup(
+      args,
+      runContext,
+      { includeSimilarity: true },
+      ["similarity", "similarity_report", "similarityReport"],
+      "similarity",
+    ),
+  timeoutBehavior: "error_as_result",
+  timeoutMs: 240_000,
+});
+
+export const checkAiDetection = tool<typeof followupSchema, GradingContext>({
+  description:
+    "Run an AI-detection pass on submissions in a previously graded run to flag likely AI-generated code.",
+  name: "check_ai_detection",
+  parameters: followupSchema,
+  strict: false,
+  execute: async (args, runContext) =>
+    runFollowup(
+      args,
+      runContext,
+      { includeAiDetection: true },
+      ["ai_detection", "aiDetection", "ai_detection_report"],
+      "aiDetection",
+    ),
   timeoutBehavior: "error_as_result",
   timeoutMs: 240_000,
 });

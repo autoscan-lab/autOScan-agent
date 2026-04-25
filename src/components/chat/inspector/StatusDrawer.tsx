@@ -44,16 +44,16 @@ function tabTone(tab: DrawerTab, active: boolean, student: StudentInspectorRow) 
   if (tab === "compile" && hasCompileIssue) {
     return active
       ? "border-[var(--linear-danger)]/35 bg-[var(--linear-danger)]/14 text-[var(--linear-danger)]"
-      : "text-[var(--linear-danger)] hover:bg-[var(--linear-danger)]/10";
+      : "border-[var(--linear-danger)]/20 bg-[var(--linear-danger)]/8 text-[var(--linear-danger)] hover:border-[var(--linear-danger)]/30 hover:bg-[var(--linear-danger)]/12";
   }
   if (tab === "banned" && hasBannedHits) {
     return active
       ? "border-orange-400/35 bg-orange-400/14 text-orange-300"
-      : "text-orange-300 hover:bg-orange-400/10";
+      : "border-orange-400/20 bg-orange-400/8 text-orange-300 hover:border-orange-400/30 hover:bg-orange-400/12";
   }
   return active
     ? "border-[var(--linear-border)] bg-white/[0.06] text-[var(--foreground)]"
-    : "text-[var(--chat-text-muted)] hover:bg-white/[0.05] hover:text-[var(--foreground)]";
+    : "border-[var(--linear-border-subtle)] bg-white/[0.02] text-[var(--chat-text-muted)] hover:border-[var(--linear-border)] hover:bg-white/[0.05] hover:text-[var(--foreground)]";
 }
 
 function locationLabel(hit: StudentInspectorRow["bannedHits"][number]) {
@@ -140,16 +140,29 @@ export function StatusDrawer({
 
   return (
     <div className="pointer-events-auto rounded-t-xl border border-b-0 border-[var(--linear-border)] bg-[#030304]/98 shadow-[0_-18px_44px_rgba(0,0,0,0.42)] backdrop-blur-md">
-      <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+      <div
+        aria-expanded={open}
+        className="group flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-2.5"
+        onClick={() => setOpen((value) => !value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setOpen((value) => !value);
+          }
+        }}
+        role="button"
+        tabIndex={0}
+      >
         <div className="flex min-w-0 items-center gap-1.5">
           {(["compile", "banned"] as DrawerTab[]).map((tab) => (
             <button
               className={cn(
-                "h-7 rounded-md border border-transparent px-2.5 text-[11px] font-[510] capitalize transition-colors",
+                "h-7 rounded-md border px-2.5 text-[11px] font-[510] capitalize transition-colors",
                 tabTone(tab, activeTab === tab, student),
               )}
               key={tab}
-              onClick={() => {
+              onClick={(event) => {
+                event.stopPropagation();
                 setActiveTab(tab);
                 setOpen(true);
               }}
@@ -159,18 +172,13 @@ export function StatusDrawer({
             </button>
           ))}
         </div>
-        <button
-          className="inline-flex items-center gap-1 font-mono text-[11px] text-[var(--chat-text-muted)] transition-colors hover:text-[var(--foreground)]"
-          onClick={() => setOpen((value) => !value)}
-          type="button"
-        >
-          {open ? "Hide" : "Details"}
+        <span className="inline-flex items-center text-[var(--chat-text-muted)] transition-colors group-hover:text-[var(--foreground)]">
           {open ? (
             <ChevronDownIcon className="size-3.5" />
           ) : (
             <ChevronUpIcon className="size-3.5" />
           )}
-        </button>
+        </span>
       </div>
 
       <div

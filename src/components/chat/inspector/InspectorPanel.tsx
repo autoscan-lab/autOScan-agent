@@ -38,7 +38,7 @@ function InspectorControls({
   view?: InspectorView;
 }) {
   return (
-    <div className="absolute right-14 top-3 z-10 flex items-center gap-1.5">
+    <div className="absolute right-14 top-[3px] z-10 flex items-center gap-1.5">
       {view && setView ? (
         <DropdownMenu>
           <DropdownMenuTrigger className="inline-flex h-7 items-center gap-1.5 rounded-md border border-[var(--linear-border)] bg-[#030304]/90 px-2.5 text-[11px] font-[510] text-[var(--chat-text-secondary)] shadow-[var(--shadow-dialog)] backdrop-blur-md transition-colors hover:bg-[#08080a] hover:text-[var(--foreground)]">

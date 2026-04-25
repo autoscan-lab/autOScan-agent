@@ -253,3 +253,61 @@
     background-color: transparent !important;
   }
 }
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/*
+ * Ditto sprite animation. The strip lives at /ditto-strip.webp
+ * (5 frames, 96px each, 480px total).
+ *
+ * Display sized via background-size to match the element box.
+ * "Looping" plays forever; "playing-once" plays one cycle and then
+ * the React state flips back to "paused" via a timer; "paused"
+ * holds the final frame so the ditto rests in place.
+ */
+.ditto-sprite {
+  --ditto-frame: 20px;
+  width: var(--ditto-frame);
+  height: var(--ditto-frame);
+  background-image: url("/ditto-strip.webp");
+  background-repeat: no-repeat;
+  background-size: calc(var(--ditto-frame) * 5) var(--ditto-frame);
+  background-position: 0 0;
+  image-rendering: pixelated;
+  display: inline-block;
+}
+
+@keyframes ditto-loop {
+  from {
+    background-position-x: 0;
+  }
+  to {
+    background-position-x: calc(var(--ditto-frame) * -4);
+  }
+}
+
+.ditto-sprite--looping {
+  animation: ditto-loop 0.5s steps(5, jump-none) infinite;
+}
+
+.ditto-sprite--playing-once {
+  animation: ditto-loop 0.5s steps(5, jump-none) 1 forwards;
+}
+
+.ditto-sprite--paused {
+  background-position-x: calc(var(--ditto-frame) * -4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ditto-sprite--looping,
+  .ditto-sprite--playing-once {
+    animation: none;
+    background-position-x: calc(var(--ditto-frame) * -4);
+  }
+}

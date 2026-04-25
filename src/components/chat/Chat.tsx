@@ -314,6 +314,7 @@ export function Chat({
                   setPanelOpen(true);
                 }}
                 selectedStudentId={selectedStudentId}
+                userName={userName}
               />
 
               {runtimeError ? (

@@ -9,7 +9,14 @@ import {
   type ToolUIPart,
   type UIMessage,
 } from "ai";
-import { BrainIcon, FileArchiveIcon, PlayIcon, WrenchIcon } from "lucide-react";
+import {
+  BotIcon,
+  BrainIcon,
+  FileArchiveIcon,
+  PlayIcon,
+  ScanSearchIcon,
+  WrenchIcon,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 
@@ -22,14 +29,12 @@ import {
   ChainOfThoughtStep,
 } from "@/components/chat/ai-elements/chain-of-thought";
 import {
-  ConversationEmptyState,
-} from "@/components/chat/ai-elements/conversation";
-import {
   Message,
   MessageContent,
   MessageResponse,
 } from "@/components/chat/ai-elements/message";
-import { formatStudentName } from "@/components/chat/support/display";
+import { firstNameOf, formatStudentName } from "@/components/chat/support/display";
+import { DittoThinking } from "@/components/chat/messages/DittoThinking";
 import { cn } from "@/lib/utils";
 
 type ToolPart = ToolUIPart | DynamicToolUIPart;
@@ -48,6 +53,7 @@ type ChatMessagesProps = {
   messages: UIMessage[];
   onSelectStudent?: (studentId: string) => void;
   selectedStudentId?: string | null;
+  userName?: string | null;
 };
 
 type GradingResultRow = {
@@ -88,6 +94,8 @@ function prettyToolTitle(toolName: string) {
 }
 
 const toolIconMap: Record<string, LucideIcon> = {
+  check_ai_detection: BotIcon,
+  check_similarity: ScanSearchIcon,
   grade_submissions: PlayIcon,
 };
 
@@ -109,6 +117,20 @@ function summarizeTool(toolName: string, part: ToolPart): ToolSummary {
     typeof value === "number" && Number.isFinite(value) ? value : undefined;
 
   switch (toolName) {
+    case "check_similarity": {
+      if (isRunning) {
+        return { chips: [], label: "Checking similarity..." };
+      }
+      return { chips: [], label: "Checked similarity" };
+    }
+
+    case "check_ai_detection": {
+      if (isRunning) {
+        return { chips: [], label: "Running AI detection..." };
+      }
+      return { chips: [], label: "Ran AI detection" };
+    }
+
     case "grade_submissions": {
       const assignment =
         str(input?.assignment_name) ??
@@ -233,18 +255,19 @@ function AssistantThoughtTrail({ message }: { message: UIMessage }) {
     return null;
   }
 
-  const label = anyActive
-    ? "Thinking..."
-    : `Thought through ${steps.length} step${steps.length === 1 ? "" : "s"}`;
-
   return (
     <ChainOfThought
       className="w-full space-y-3"
       onOpenChange={setOpen}
       open={open}
     >
-      <ChainOfThoughtHeader className="text-[var(--chat-text-muted)] hover:text-[var(--foreground)]">
-        <span className="flex-1 text-left font-[510]">{label}</span>
+      <ChainOfThoughtHeader
+        className="text-[var(--chat-text-muted)] hover:text-[var(--foreground)]"
+        leading={null}
+      >
+        <span className="flex-1 text-left">
+          <DittoThinking active={anyActive} stepCount={steps.length} />
+        </span>
       </ChainOfThoughtHeader>
       <ChainOfThoughtContent className="ml-1 border-l border-[var(--linear-border-subtle)] pl-3">
         {steps.map((step, index) =>
@@ -430,25 +453,27 @@ function GradingResultsTable({
   );
 }
 
+function buildWelcomeText(userName?: string | null) {
+  const firstName = firstNameOf(userName);
+  const greeting = firstName ? `hey ${firstName}!` : "hey!";
+  return `${greeting} I'm autOScan, your grading helper.\n\nDrop a submissions zip in the box below and tell me the assignment name (something like S0 or S2). I'll compile everything, run the tests, and flag any banned functions for you.\n\nOnce that's done, I can also check submissions for similarity if you want to spot copies, or run an AI detection pass on the code. Just ask.`;
+}
+
 export function ChatMessages({
   messages,
   onSelectStudent,
   selectedStudentId,
+  userName,
 }: ChatMessagesProps) {
-  if (messages.length === 0) {
-    return (
-      <ConversationEmptyState className="gap-3 pt-32">
-        <h2 className="font-heading text-[32px] font-[510] leading-[1.1] tracking-[-0.025em] text-[var(--foreground)]">
-          What are we grading today?
-        </h2>
-        <p className="text-[14px] leading-relaxed text-[var(--chat-text-muted)]">
-          Attach submissions and ask for a grade
-        </p>
-      </ConversationEmptyState>
-    );
-  }
+  const welcomeBubble = (
+    <Message className="max-w-full" from="assistant" key="welcome">
+      <MessageContent className="w-full max-w-full gap-3">
+        <MessageResponse>{buildWelcomeText(userName)}</MessageResponse>
+      </MessageContent>
+    </Message>
+  );
 
-  return messages.map((message) => {
+  const messageNodes = messages.map((message) => {
     const isAssistant = message.role === "assistant";
     const hasThoughts =
       isAssistant &&
@@ -498,4 +523,11 @@ export function ChatMessages({
       </Message>
     );
   });
+
+  return (
+    <>
+      {welcomeBubble}
+      {messageNodes}
+    </>
+  );
 }

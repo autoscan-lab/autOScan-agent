@@ -4,6 +4,18 @@ export function formatStudentName(studentId: string) {
   return tail && tail.length > 0 ? tail : trimmed;
 }
 
+export function firstNameOf(name: string | null | undefined) {
+  if (!name) {
+    return null;
+  }
+  const trimmed = name.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const first = trimmed.split(/\s+/)[0];
+  return first ? first.charAt(0).toUpperCase() + first.slice(1) : null;
+}
+
 export function initialsOf(name: string) {
   const parts = name
     .split(/[\s@.]+/)
