@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import type { FileUIPart } from "ai";
+import type { FileUIPart, UIMessage } from "ai";
 import {
   LogOutIcon,
   PanelRightCloseIcon,
@@ -45,6 +45,100 @@ const PixelBlastBackground = dynamic(() => import("@/components/chat/PixelBlast"
 const chatWatchdogMs = 180_000;
 const maxZipUploadBytes = 12 * 1024 * 1024;
 const zipAcceptAttr = ".zip,application/zip,application/x-zip-compressed";
+const assignmentPattern = /\bS\d+\b/i;
+
+function latestRunId(messages: UIMessage[]) {
+  for (let messageIndex = messages.length - 1; messageIndex >= 0; messageIndex -= 1) {
+    const message = messages[messageIndex];
+    if (message.role !== "assistant") {
+      continue;
+    }
+
+    for (let partIndex = message.parts.length - 1; partIndex >= 0; partIndex -= 1) {
+      const part = message.parts[partIndex];
+      if (!("output" in part) || typeof part.output !== "object" || !part.output) {
+        continue;
+      }
+      const output = part.output as Record<string, unknown>;
+      const runId = output.runId;
+      if (typeof runId === "string" && runId.trim()) {
+        return runId.trim();
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function ackTextForToolReadyTurn(
+  text: string,
+  files: FileUIPart[],
+  messages: UIMessage[],
+) {
+  const normalized = text.toLowerCase();
+  const hasAssignment = assignmentPattern.test(text);
+
+  if (files.length > 0 && hasAssignment) {
+    return "Got it, I have your zip and assignment. I'll run the grader now.";
+  }
+
+  const hasRunId = Boolean(latestRunId(messages));
+  if (hasRunId && normalized.includes("similar")) {
+    return "Got it, I'll run a similarity check now.";
+  }
+  if (
+    hasRunId &&
+    (normalized.includes("ai detect") ||
+      normalized.includes("ai detection") ||
+      normalized.includes("ai-generated"))
+  ) {
+    return "Got it, I'll run AI detection now.";
+  }
+
+  return undefined;
+}
+
+function isLocalAckMessage(message: UIMessage) {
+  if (message.role !== "assistant" || typeof message.metadata !== "object") {
+    return false;
+  }
+  if (!message.metadata || Array.isArray(message.metadata)) {
+    return false;
+  }
+  return (message.metadata as Record<string, unknown>).localAck === true;
+}
+
+function insertAckAfterLatestUser(messages: UIMessage[], ackText: string) {
+  let latestUserIndex = -1;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === "user") {
+      latestUserIndex = index;
+      break;
+    }
+  }
+
+  if (latestUserIndex < 0) {
+    return messages;
+  }
+
+  const next = messages[latestUserIndex + 1];
+  if (next && isLocalAckMessage(next)) {
+    return messages;
+  }
+
+  const ackMessage: UIMessage = {
+    id: `ack-${crypto.randomUUID()}`,
+    metadata: { localAck: true },
+    parts: [{ state: "done", text: ackText, type: "text" }],
+    role: "assistant",
+  };
+
+  return [
+    ...messages.slice(0, latestUserIndex + 1),
+    ackMessage,
+    ...messages.slice(latestUserIndex + 1),
+  ];
+}
 
 export function Chat({
   initialChatId,
@@ -136,6 +230,7 @@ export function Chat({
 
       try {
         const uploaded = message.files;
+        const ackText = ackTextForToolReadyTurn(trimmedText, uploaded, messageList);
 
         if (uploaded.length > 0 && trimmedText) {
           void sendMessage({ files: uploaded, text: trimmedText });
@@ -143,6 +238,12 @@ export function Chat({
           void sendMessage({ files: uploaded });
         } else {
           void sendMessage({ text: trimmedText });
+        }
+
+        if (ackText) {
+          queueMicrotask(() => {
+            setMessages((current) => insertAckAfterLatestUser(current, ackText));
+          });
         }
       } catch (submitError) {
         setAttachmentError(
@@ -153,7 +254,7 @@ export function Chat({
         throw submitError;
       }
     },
-    [sendMessage],
+    [messageList, sendMessage, setMessages],
   );
 
   useEffect(() => {
