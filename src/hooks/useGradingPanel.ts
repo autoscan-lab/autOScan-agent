@@ -213,6 +213,26 @@ function scanToolReports(messages: UIMessage[]): ToolReports {
   };
 }
 
+function reportFromPanelData(
+  panelData: GradingRunResponse | null,
+  field: "similarityReport" | "aiDetectionReport",
+  kind: string,
+): ToolReport | null {
+  if (!panelData) {
+    return null;
+  }
+  const report = panelData[field];
+  if (report == null) {
+    return null;
+  }
+  return {
+    assignmentName: panelData.assignmentName,
+    payload: report,
+    runId: panelData.runId,
+    toolCallId: `stored:${kind}:${panelData.runId ?? "unknown"}`,
+  };
+}
+
 export function useGradingPanel(messages: UIMessage[]) {
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelLoading, setPanelLoading] = useState(false);
@@ -232,7 +252,7 @@ export function useGradingPanel(messages: UIMessage[]) {
   const loadedRunId = useRef<string | null>(null);
   const openedToolCallId = useRef<string | null>(null);
 
-  const refreshPanelData = useCallback(async (runId: string) => {
+  const refreshPanelData = useCallback(async (runId: string, targetView?: InspectorView) => {
     setPanelLoading(true);
     setPanelError(null);
 
@@ -258,6 +278,16 @@ export function useGradingPanel(messages: UIMessage[]) {
         }
         return payload.students[0]?.studentId ?? null;
       });
+
+      // After data loads, switch to the target view if its report is present.
+      // This handles the case where the report wasn't yet in the message scan
+      // result when the panel first opened (e.g. a race where the similarity
+      // report arrives via R2 rather than directly from the tool output).
+      if (targetView === "similarity" && payload.similarityReport != null) {
+        setPanelView("similarity");
+      } else if (targetView === "aiDetection" && payload.aiDetectionReport != null) {
+        setPanelView("aiDetection");
+      }
     } catch (refreshError) {
       setPanelError(
         refreshError instanceof Error
@@ -276,6 +306,10 @@ export function useGradingPanel(messages: UIMessage[]) {
     void refreshPanelData(currentRun.runId);
   }, [currentRun?.runId, refreshPanelData]);
 
+  // Open the panel and switch to the relevant view whenever a tool completes.
+  // We call setPanelView directly (no setTimeout) to avoid a cleanup-race where
+  // a React re-render between the effect and a deferred callback would cancel
+  // the timeout before it fired, leaving the panel stuck on the wrong view.
   useEffect(() => {
     if (!latestEvent?.toolCallId) {
       return;
@@ -284,6 +318,7 @@ export function useGradingPanel(messages: UIMessage[]) {
       return;
     }
     openedToolCallId.current = latestEvent.toolCallId;
+
     const eventRunId = latestEvent.runId ?? currentRun?.runId ?? null;
     const nextView =
       latestEvent.kind === "similarity"
@@ -291,23 +326,17 @@ export function useGradingPanel(messages: UIMessage[]) {
         : latestEvent.kind === "aiDetection"
           ? "aiDetection"
           : "source";
-    const openTimeout = window.setTimeout(() => {
-      setPanelView(nextView);
-      setPanelOpen(true);
-    }, 0);
-    const runIdForRefresh =
-      latestEvent.kind !== "grading" ? eventRunId : null;
-    const refreshTimeout = runIdForRefresh
-      ? window.setTimeout(() => {
-          void refreshPanelData(runIdForRefresh);
-        }, 0)
-      : undefined;
-    return () => {
-      window.clearTimeout(openTimeout);
-      if (refreshTimeout) {
-        window.clearTimeout(refreshTimeout);
-      }
-    };
+
+    setPanelView(nextView);
+    setPanelOpen(true);
+
+    // For followup tools, refresh the stored session so the fallback reports
+    // are populated. refreshPanelData will re-apply the view once data loads,
+    // handling cases where the report isn't yet in the message scan result.
+    const runIdForRefresh = latestEvent.kind !== "grading" ? eventRunId : null;
+    if (runIdForRefresh) {
+      void refreshPanelData(runIdForRefresh, nextView);
+    }
   }, [
     currentRun?.runId,
     latestEvent?.kind,
@@ -316,29 +345,15 @@ export function useGradingPanel(messages: UIMessage[]) {
     refreshPanelData,
   ]);
 
-  const fallbackSimilarityReport = useMemo<ToolReport | null>(() => {
-    if (panelData?.similarityReport === undefined || panelData?.similarityReport === null) {
-      return null;
-    }
-    return {
-      assignmentName: panelData.assignmentName,
-      payload: panelData.similarityReport,
-      runId: panelData.runId,
-      toolCallId: `stored:similarity:${panelData.runId ?? "unknown"}`,
-    };
-  }, [panelData]);
+  const fallbackSimilarityReport = useMemo(
+    () => reportFromPanelData(panelData, "similarityReport", "similarity"),
+    [panelData],
+  );
 
-  const fallbackAiDetectionReport = useMemo<ToolReport | null>(() => {
-    if (panelData?.aiDetectionReport === undefined || panelData?.aiDetectionReport === null) {
-      return null;
-    }
-    return {
-      assignmentName: panelData.assignmentName,
-      payload: panelData.aiDetectionReport,
-      runId: panelData.runId,
-      toolCallId: `stored:ai-detection:${panelData.runId ?? "unknown"}`,
-    };
-  }, [panelData]);
+  const fallbackAiDetectionReport = useMemo(
+    () => reportFromPanelData(panelData, "aiDetectionReport", "ai-detection"),
+    [panelData],
+  );
 
   const resetPanel = useCallback(() => {
     setPanelOpen(false);

@@ -121,11 +121,14 @@ export function InspectorPanel({
   }, [aiDetectionReport, hasStudents, similarityReport]);
 
   useEffect(() => {
-    if (availableViews.length === 0 || availableViews.includes(view)) {
+    // Don't reset while the panel is loading — the report may still be on its
+    // way, and resetting here would cause the view to flicker back to "source"
+    // before the data arrives.
+    if (loading || availableViews.length === 0 || availableViews.includes(view)) {
       return;
     }
     onViewChange(availableViews[0]);
-  }, [availableViews, onViewChange, view]);
+  }, [availableViews, loading, onViewChange, view]);
 
   function revealSourceLine(line: number) {
     onViewChange("source");
