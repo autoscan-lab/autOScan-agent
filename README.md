@@ -14,7 +14,7 @@
 
 ## What It Does
 
-`autOScan-agent` is a web agent that sits in front of the autOScan engine ([autoscan-lab/autoscan-engine](https://github.com/autoscan-lab/autoscan-engine)). The engine is where grading and follow-up analysis actually run. The agent is how you drive that work in one back-and-forth.
+`autOScan-agent` is a web agent that sits in front of the autOScan engine ([autoscan-lab/autoscan-engine](https://github.com/autoscan-lab/autoscan-engine)). The engine is where grading and follow-up analysis actually run. The agent is how you drive that work in a conversation.
 
 You attach the submissions, mention the assignment and keep the conversation in one thread. Ask for similarity or AI-detection checks when that makes sense for the batch you just ran.
 
