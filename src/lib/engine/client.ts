@@ -6,17 +6,11 @@ export type EngineUpload = {
   mediaType: string;
 };
 
-export type EngineAnalyzeOptions = {
+type EngineAnalyzeOptions = {
   includeSpans?: boolean;
   topK?: number;
 };
 
-export type EngineSetupResult = {
-  assignment: string;
-  config_dir: string;
-  files_downloaded: number;
-  status: string;
-};
 
 export class EngineRequestError extends Error {
   constructor(
@@ -78,7 +72,7 @@ export async function setupEngineAssignment(assignmentName: string) {
     },
   );
 
-  return parseEngineResponse<EngineSetupResult>(response);
+  return parseEngineResponse<unknown>(response);
 }
 
 export async function gradeEngineSubmissions(

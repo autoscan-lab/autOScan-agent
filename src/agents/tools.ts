@@ -32,7 +32,6 @@ type AttachmentFile = {
   mediaType: string;
 };
 
-type ToolArgs = Record<string, unknown>;
 type ToolParameter = {
   description?: string;
   type: "number" | "string";
@@ -71,12 +70,8 @@ const followupSchema: NonStrictToolSchema = {
   type: "object",
 };
 
-function isToolArgs(value: unknown): value is ToolArgs {
-  return typeof value === "object" && value !== null;
-}
-
 function pickStringArg(args: unknown, ...keys: string[]) {
-  if (!isToolArgs(args)) {
+  if (!isRecord(args)) {
     return undefined;
   }
 
@@ -91,17 +86,6 @@ function pickStringArg(args: unknown, ...keys: string[]) {
   }
 
   return undefined;
-}
-
-function contextUserId(userId?: string) {
-  return normalizeUserId(userId);
-}
-
-async function rememberSession(
-  userId: string | undefined,
-  session: StoredGradingSession,
-) {
-  await saveGradingSession(contextUserId(userId), session);
 }
 
 function pickZipAttachment(
@@ -137,7 +121,7 @@ async function attachmentToFile(
       throw new Error("Uploaded attachment reference is invalid.");
     }
 
-    const normalizedUserId = contextUserId(userId);
+    const normalizedUserId = normalizeUserId(userId);
     const expectedUserKey = userStorageKey(normalizedUserId);
     if (!objectKey.includes(`/${expectedUserKey}/`)) {
       throw new Error("Uploaded attachment does not belong to this user.");
@@ -237,7 +221,7 @@ export const gradeSubmissions = tool<
       };
     }
 
-    const userId = contextUserId(runContext?.context.userId);
+    const userId = normalizeUserId(runContext?.context.userId);
     const file = await attachmentToFile(attachment, userId);
     const rawResult = await runEngineGrade(assignmentName, file);
     if (!isRecord(rawResult)) {
@@ -245,8 +229,7 @@ export const gradeSubmissions = tool<
         message: "Grading returned an invalid engine response. Please try again.",
       };
     }
-    const result = rawResult;
-    const runId = pickStringArg(result, "run_id", "runId");
+    const runId = pickStringArg(rawResult, "run_id", "runId");
     if (!runId) {
       return {
         message: "Grading finished but no run_id was returned by the engine.",
@@ -255,17 +238,17 @@ export const gradeSubmissions = tool<
 
     const now = new Date().toISOString();
 
-    await rememberSession(userId, {
+    await saveGradingSession(userId, {
       assignmentName,
       createdAt: now,
       id: runId,
-      result,
+      result: rawResult,
       updatedAt: now,
       uploads: [],
     });
     await saveLatestRunId(userId, runId);
 
-    const students = studentsFromResult(result);
+    const students = studentsFromResult(rawResult);
     return {
       assignmentName,
       runId,
@@ -371,7 +354,7 @@ async function runFollowup(
   runContext: { context: GradingContext } | undefined,
   config: FollowupToolConfig,
 ) {
-  const userId = contextUserId(runContext?.context.userId);
+  const userId = normalizeUserId(runContext?.context.userId);
   const loaded = await latestSession(userId);
   if ("error" in loaded) {
     return { message: loaded.error };
@@ -387,19 +370,17 @@ async function runFollowup(
       summary: { hasReport: false },
     };
   }
-  const result = rawResult;
-
   const now = new Date().toISOString();
-  await rememberSession(userId, {
+  await saveGradingSession(userId, {
     ...session,
     result: {
       ...session.result,
-      ...result,
+      ...rawResult,
     },
     updatedAt: now,
   });
 
-  const payload = pickFollowupResult(result, ...config.payloadKeys);
+  const payload = pickFollowupResult(rawResult, ...config.payloadKeys);
 
   return {
     assignmentName: session.assignmentName,
