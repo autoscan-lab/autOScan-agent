@@ -8,9 +8,7 @@ type SimilarityPair = {
   b: string;
   flagged: boolean;
   matches?: unknown[];
-  per_func_similarity: number;
-  window_jaccard: number;
-  window_matches: number;
+  similarity_percent: number;
 };
 
 type SimilarityReport = {
@@ -50,9 +48,7 @@ function isSimilarityPair(value: unknown): value is SimilarityPair {
     typeof value.a === "string" &&
     typeof value.b === "string" &&
     typeof value.flagged === "boolean" &&
-    isNumber(value.per_func_similarity) &&
-    isNumber(value.window_jaccard) &&
-    isNumber(value.window_matches)
+    isNumber(value.similarity_percent)
   );
 }
 
@@ -174,10 +170,13 @@ function SimilaritySection({ report }: { report: ToolReport }) {
               <td
                 className={cn(
                   "px-4 py-2.5 text-right font-mono font-[650]",
-                  scoreTone(pair.flagged, pair.window_jaccard),
+                  scoreTone(
+                    pair.flagged,
+                    pair.similarity_percent / 100,
+                  ),
                 )}
               >
-                {percent(pair.window_jaccard)}
+                {`${Math.round(pair.similarity_percent)}%`}
               </td>
               <td
                 className={cn(

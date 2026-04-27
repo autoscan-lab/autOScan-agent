@@ -1,7 +1,7 @@
 <h1 align="center">autOScan-agent</h1>
 
 <p align="center">
-  <strong>Web chat for autOScan grading with a tool-calling agent.</strong>
+  <strong>Web agent that helps you grade in a single conversation.</strong>
 </p>
 
 <p align="center">
@@ -14,9 +14,9 @@
 
 ## What It Does
 
-`autOScan-agent` is a web chat app for running autOScan grades without leaving the browser.  
-Sign in with Google, upload a submissions zip, provide the assignment name, and the assistant runs the grader and returns a clean results summary in chat.  
-Chat history is saved in MongoDB, and uploaded files plus grading run metadata are stored in Cloudflare R2.
+`autOScan-agent` is a web agent that sits in front of the autOScan engine ([autoscan-lab/autoscan-engine](https://github.com/autoscan-lab/autoscan-engine)). The engine is where grading and follow-up analysis actually run. The agent is how you drive that work in one back-and-forth.
+
+You attach the submissions, mention the assignment and keep the conversation in one thread. Ask for similarity or AI-detection checks when that makes sense for the batch you just ran.
 
 ---
 
@@ -30,11 +30,10 @@ Chat history is saved in MongoDB, and uploaded files plus grading run metadata a
 
 ## Features
 
-- Single tool surface for grading: `grade_submissions(assignment_name)`
+- Agent tools: `grade_submissions`, `check_similarity` and `check_ai_detection`
 - Grading from attached zip files in chat
-- Compact markdown results table (`studentId`, `status`, `grade`)
-- Durable chat id + messages in MongoDB (sessions survive reloads)
-- Run artifacts in R2 (uploads + run metadata addressable by run id)
+- Durable chat id + messages in MongoDB
+- Run artifacts in R2
 
 ---
 
