@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   try {
     const result = await runEngineSimilarityAnalyze(payload.runId, {
       includeSpans: payload.includeSpans,
-      topK: payload.topK,
+      minScore: payload.minScore,
     });
     return Response.json(result);
   } catch (error) {

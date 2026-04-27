@@ -1,7 +1,7 @@
 type AnalyzePayload = {
   includeSpans?: boolean;
+  minScore?: number;
   runId: string;
-  topK?: number;
 };
 
 function stringField(body: unknown, ...keys: string[]) {
@@ -32,7 +32,7 @@ function boolField(body: unknown, ...keys: string[]) {
   return undefined;
 }
 
-function numberField(body: unknown, ...keys: string[]) {
+function floatField(body: unknown, ...keys: string[]) {
   if (typeof body !== "object" || body === null) {
     return undefined;
   }
@@ -40,7 +40,7 @@ function numberField(body: unknown, ...keys: string[]) {
   for (const key of keys) {
     const value = record[key];
     if (typeof value === "number" && Number.isFinite(value)) {
-      return Math.floor(value);
+      return value;
     }
   }
   return undefined;
@@ -52,15 +52,15 @@ export function parseAnalyzePayload(body: unknown): AnalyzePayload | null {
     return null;
   }
 
-  const topK = numberField(body, "top_k", "topK");
-  if (topK !== undefined && topK < 0) {
+  const minScore = floatField(body, "min_score", "minScore");
+  if (minScore !== undefined && (minScore < 0 || minScore > 100)) {
     return null;
   }
 
   return {
     includeSpans: boolField(body, "include_spans", "includeSpans"),
+    minScore,
     runId,
-    topK,
   };
 }
 

@@ -8,7 +8,7 @@ export type EngineUpload = {
 
 type EngineAnalyzeOptions = {
   includeSpans?: boolean;
-  topK?: number;
+  minScore?: number;
 };
 
 
@@ -102,14 +102,6 @@ export async function runEngineGrade(
   return gradeEngineSubmissions(upload);
 }
 
-function normalizeTopK(value: number | undefined) {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return undefined;
-  }
-  const normalized = Math.floor(value);
-  return normalized >= 0 ? normalized : undefined;
-}
-
 async function runEngineAnalyze(
   endpoint: "similarity" | "ai-detection",
   runId: string,
@@ -126,9 +118,8 @@ async function runEngineAnalyze(
   if (options.includeSpans !== undefined) {
     body.include_spans = options.includeSpans;
   }
-  const topK = normalizeTopK(options.topK);
-  if (topK !== undefined) {
-    body.top_k = topK;
+  if (typeof options.minScore === "number" && options.minScore >= 0) {
+    body.min_score = options.minScore;
   }
 
   const response = await fetch(`${engineBaseUrl()}/analyze/${endpoint}`, {

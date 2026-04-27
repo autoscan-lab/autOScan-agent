@@ -412,7 +412,7 @@ function createFollowupTool(config: FollowupToolConfig) {
 }
 
 export const checkSimilarity = createFollowupTool({
-  analyze: (runId) => runEngineSimilarityAnalyze(runId),
+  analyze: (runId) => runEngineSimilarityAnalyze(runId, { includeSpans: true, minScore: 40 }),
   description:
     "Check pairwise similarity across submissions in the latest graded run to spot potential copies.",
   name: "check_similarity",
@@ -421,7 +421,7 @@ export const checkSimilarity = createFollowupTool({
 });
 
 export const checkAiDetection = createFollowupTool({
-  analyze: (runId) => runEngineAiDetectionAnalyze(runId),
+  analyze: (runId) => runEngineAiDetectionAnalyze(runId, { includeSpans: true, minScore: 40 }),
   description:
     "Run an AI-detection pass on submissions in the latest graded run to flag likely AI-generated code.",
   name: "check_ai_detection",
