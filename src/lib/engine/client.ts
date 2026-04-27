@@ -6,9 +6,9 @@ export type EngineUpload = {
   mediaType: string;
 };
 
-export type EngineGradeOptions = {
-  includeAiDetection?: boolean;
-  includeSimilarity?: boolean;
+export type EngineAnalyzeOptions = {
+  includeSpans?: boolean;
+  topK?: number;
 };
 
 export type EngineSetupResult = {
@@ -83,20 +83,12 @@ export async function setupEngineAssignment(assignmentName: string) {
 
 export async function gradeEngineSubmissions(
   upload: EngineUpload,
-  options: EngineGradeOptions = {},
 ) {
   const formData = new FormData();
   const blob = new Blob([new Uint8Array(upload.bytes)], {
     type: upload.mediaType,
   });
   formData.set("file", blob, upload.filename);
-
-  if (options.includeSimilarity) {
-    formData.set("include_similarity", "1");
-  }
-  if (options.includeAiDetection) {
-    formData.set("include_ai_detection", "1");
-  }
 
   const response = await fetch(`${engineBaseUrl()}/grade`, {
     body: formData,
@@ -111,8 +103,63 @@ export async function gradeEngineSubmissions(
 export async function runEngineGrade(
   assignmentName: string,
   upload: EngineUpload,
-  options: EngineGradeOptions = {},
 ) {
   await setupEngineAssignment(assignmentName);
-  return gradeEngineSubmissions(upload, options);
+  return gradeEngineSubmissions(upload);
+}
+
+function normalizeTopK(value: number | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return undefined;
+  }
+  const normalized = Math.floor(value);
+  return normalized >= 0 ? normalized : undefined;
+}
+
+async function runEngineAnalyze(
+  endpoint: "similarity" | "ai-detection",
+  runId: string,
+  options: EngineAnalyzeOptions = {},
+) {
+  const normalizedRunId = runId.trim();
+  if (!normalizedRunId) {
+    throw new Error("Missing engine run_id.");
+  }
+
+  const body: Record<string, unknown> = {
+    run_id: normalizedRunId,
+  };
+  if (options.includeSpans !== undefined) {
+    body.include_spans = options.includeSpans;
+  }
+  const topK = normalizeTopK(options.topK);
+  if (topK !== undefined) {
+    body.top_k = topK;
+  }
+
+  const response = await fetch(`${engineBaseUrl()}/analyze/${endpoint}`, {
+    body: JSON.stringify(body),
+    headers: {
+      ...engineHeaders(),
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+    signal: AbortSignal.timeout(240_000),
+  });
+
+  return parseEngineResponse<EngineResult>(response);
+}
+
+export async function runEngineSimilarityAnalyze(
+  runId: string,
+  options: EngineAnalyzeOptions = {},
+) {
+  return runEngineAnalyze("similarity", runId, options);
+}
+
+export async function runEngineAiDetectionAnalyze(
+  runId: string,
+  options: EngineAnalyzeOptions = {},
+) {
+  return runEngineAnalyze("ai-detection", runId, options);
 }

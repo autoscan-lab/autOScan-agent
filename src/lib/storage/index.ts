@@ -1,8 +1,10 @@
 export {
   deleteStoredFileByKey,
   deleteUserStoredRuns,
+  getLatestRunId,
   getGradingSession,
   getStoredFileByKey,
+  saveLatestRunId,
   saveGradingSession,
   saveUploadedFile,
   type EngineResult,

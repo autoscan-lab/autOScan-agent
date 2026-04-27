@@ -335,7 +335,9 @@ export function useGradingPanel(messages: UIMessage[]) {
     // handling cases where the report isn't yet in the message scan result.
     const runIdForRefresh = latestEvent.kind !== "grading" ? eventRunId : null;
     if (runIdForRefresh) {
-      void refreshPanelData(runIdForRefresh, nextView);
+      queueMicrotask(() => {
+        void refreshPanelData(runIdForRefresh, nextView);
+      });
     }
   }, [
     currentRun?.runId,

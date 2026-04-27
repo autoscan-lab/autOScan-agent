@@ -73,17 +73,27 @@ function compactReplayText(value: string) {
   return `${value.slice(0, maxReplayTextChars)}...[truncated]`;
 }
 
+function hasReportFromSummary(output: Record<string, unknown> | undefined) {
+  const summary = recordOf(output?.summary);
+  return typeof summary?.hasReport === "boolean" ? summary.hasReport : undefined;
+}
+
 function minimalToolOutput(part: ToolPart, toolName: string) {
   const input = recordOf(part.input);
   const output = recordOf("output" in part ? part.output : undefined);
   const runId = stringOf(output?.runId) ?? stringOf(input?.run_id);
   const assignmentName =
     stringOf(output?.assignmentName) ?? stringOf(input?.assignment_name);
+  const summaryHasReport = hasReportFromSummary(output);
 
   if (toolName === "grade_submissions" || toolName === "check_similarity") {
+    const similarity = recordOf(output?.similarity) ?? recordOf(output?.similarity_report);
     return {
       assignmentName: assignmentName ?? null,
-      hasReport: toolName === "check_similarity" ? Boolean(output?.similarity) : true,
+      hasReport:
+        toolName === "check_similarity"
+          ? summaryHasReport ?? Boolean(similarity)
+          : true,
       runId: runId ?? null,
     };
   }
@@ -93,7 +103,7 @@ function minimalToolOutput(part: ToolPart, toolName: string) {
       recordOf(output?.aiDetection) ?? recordOf(output?.ai_detection);
     return {
       assignmentName: assignmentName ?? null,
-      hasReport: Boolean(detection),
+      hasReport: summaryHasReport ?? Boolean(detection),
       runId: runId ?? null,
     };
   }

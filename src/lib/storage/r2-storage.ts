@@ -34,6 +34,11 @@ export type StoredGradingSession = {
   uploads: StoredUpload[];
 };
 
+type LatestRunPointer = {
+  runId: string;
+  updatedAt: string;
+};
+
 type SaveUploadInput = {
   bytes: Buffer;
   contentType: string;
@@ -161,6 +166,12 @@ async function getJson<T>(key: string) {
   return JSON.parse(object.bytes.toString("utf8")) as T;
 }
 
+function latestRunKeyForUser(userId: string) {
+  const prefix = storagePrefix();
+  const userKey = userStorageKey(userId);
+  return `${prefix}/runs/${userKey}/latest.json`;
+}
+
 export async function saveUploadedFile(input: SaveUploadInput): Promise<StoredUpload> {
   const filename = safeObjectFilename(input.filename, "submissions.zip");
   const keys = buildRunKeys({
@@ -205,6 +216,26 @@ export async function getGradingSession(userId: string, runId: string) {
   });
 
   return getJson<StoredGradingSession>(runKeys.runKey);
+}
+
+export async function saveLatestRunId(userId: string, runId: string) {
+  const normalizedRunId = runId.trim();
+  if (!normalizedRunId) {
+    return;
+  }
+  await putJson<LatestRunPointer>(latestRunKeyForUser(userId), {
+    runId: normalizedRunId,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+export async function getLatestRunId(userId: string) {
+  const pointer = await getJson<LatestRunPointer>(latestRunKeyForUser(userId));
+  if (!pointer || typeof pointer.runId !== "string") {
+    return null;
+  }
+  const normalizedRunId = pointer.runId.trim();
+  return normalizedRunId || null;
 }
 
 export async function getStoredFileByKey(key: string) {

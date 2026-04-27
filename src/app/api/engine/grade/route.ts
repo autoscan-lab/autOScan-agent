@@ -7,15 +7,6 @@ export const maxDuration = 300;
 
 const maxUploadBytes = 256 * 1024 * 1024;
 
-function formBool(formData: FormData, key: string) {
-  const value = formData.get(key);
-  if (typeof value !== "string") {
-    return false;
-  }
-
-  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
-}
-
 function stringField(formData: FormData, ...keys: string[]) {
   for (const key of keys) {
     const value = formData.get(key);
@@ -66,10 +57,6 @@ export async function POST(request: Request) {
         bytes: Buffer.from(await uploaded.arrayBuffer()),
         filename: uploaded.name || "submissions.zip",
         mediaType: uploaded.type || "application/zip",
-      },
-      {
-        includeAiDetection: formBool(formData, "include_ai_detection"),
-        includeSimilarity: formBool(formData, "include_similarity"),
       },
     );
 

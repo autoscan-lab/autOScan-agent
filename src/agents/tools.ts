@@ -1,23 +1,22 @@
-import { randomUUID } from "node:crypto";
-
 import { tool } from "@openai/agents";
 
 import type { UploadedAttachment } from "@/lib/chat/message-converters";
 import {
-  type EngineGradeOptions,
+  runEngineAiDetectionAnalyze,
   runEngineGrade,
+  runEngineSimilarityAnalyze,
 } from "@/lib/engine/client";
 import {
   studentsFromResult,
   type StudentRow,
 } from "@/lib/grading";
 import {
+  getLatestRunId,
   getGradingSession,
   getStoredFileByKey,
+  saveLatestRunId,
   saveGradingSession,
-  saveUploadedFile,
   type StoredGradingSession,
-  type StoredUpload,
   userStorageKey,
 } from "@/lib/storage";
 import { normalizeUserId } from "@/lib/auth";
@@ -31,7 +30,6 @@ type AttachmentFile = {
   bytes: Buffer;
   filename: string;
   mediaType: string;
-  storedUpload?: StoredUpload;
 };
 
 type ToolArgs = Record<string, unknown>;
@@ -46,6 +44,7 @@ type NonStrictToolSchema = {
   type: "object";
 };
 type FollowupPayloadField = "similarity" | "aiDetection";
+type FollowupToolName = "check_similarity" | "check_ai_detection";
 
 const gradeSubmissionsSchema: NonStrictToolSchema = {
   additionalProperties: true,
@@ -64,11 +63,11 @@ const followupSchema: NonStrictToolSchema = {
   properties: {
     run_id: {
       description:
-        "The runId returned by a previous grade_submissions call in this conversation.",
+        "Optional run id. The tool always uses the latest graded run in this chat context.",
       type: "string",
     },
   },
-  required: ["run_id"],
+  required: [],
   type: "object",
 };
 
@@ -153,13 +152,6 @@ async function attachmentToFile(
       bytes: object.bytes,
       filename,
       mediaType: object.contentType ?? attachment.mediaType ?? "application/zip",
-      storedUpload: {
-        contentType:
-          object.contentType ?? attachment.mediaType ?? "application/zip",
-        filename,
-        key: object.key,
-        sizeBytes: object.bytes.byteLength,
-      },
     };
   }
 
@@ -246,18 +238,21 @@ export const gradeSubmissions = tool<
     }
 
     const userId = contextUserId(runContext?.context.userId);
-    const runId = randomUUID();
     const file = await attachmentToFile(attachment, userId);
-    const upload =
-      file.storedUpload ??
-      (await saveUploadedFile({
-        bytes: file.bytes,
-        contentType: file.mediaType,
-        filename: file.filename,
-        runId,
-        userId,
-      }));
-    const result = await runEngineGrade(assignmentName, file);
+    const rawResult = await runEngineGrade(assignmentName, file);
+    if (!isRecord(rawResult)) {
+      return {
+        message: "Grading returned an invalid engine response. Please try again.",
+      };
+    }
+    const result = rawResult;
+    const runId = pickStringArg(result, "run_id", "runId");
+    if (!runId) {
+      return {
+        message: "Grading finished but no run_id was returned by the engine.",
+      };
+    }
+
     const now = new Date().toISOString();
 
     await rememberSession(userId, {
@@ -266,8 +261,9 @@ export const gradeSubmissions = tool<
       id: runId,
       result,
       updatedAt: now,
-      uploads: [upload],
+      uploads: [],
     });
+    await saveLatestRunId(userId, runId);
 
     const students = studentsFromResult(result);
     return {
@@ -281,33 +277,21 @@ export const gradeSubmissions = tool<
   timeoutMs: 240_000,
 });
 
-async function loadSessionUpload(userId: string, runId: string) {
-  const session = await getGradingSession(userId, runId);
-  if (!session) {
-    return { error: "Run not found. Ask the user which run to inspect." } as const;
-  }
-
-  const upload = session.uploads[0];
-  if (!upload) {
-    return { error: "Stored run has no upload to re-analyze." } as const;
-  }
-
-  const stored = await getStoredFileByKey(upload.key);
-  if (!stored) {
+async function latestSession(userId: string) {
+  const runId = await getLatestRunId(userId);
+  if (!runId) {
     return {
-      error:
-        "The original zip is no longer available. Ask the user to re-upload it.",
+      error: "No graded run is available yet. Ask the user to grade first.",
     } as const;
   }
-
-  return {
-    file: {
-      bytes: stored.bytes,
-      filename: upload.filename,
-      mediaType: stored.contentType ?? upload.contentType ?? "application/zip",
-    },
-    session,
-  } as const;
+  const session = await getGradingSession(userId, runId);
+  if (!session) {
+    return {
+      error:
+        "The latest graded run is not available in storage. Ask the user to grade again.",
+    } as const;
+  }
+  return { runId, session } as const;
 }
 
 function pickFollowupResult(
@@ -359,82 +343,107 @@ function summarizeFollowupPayload(
   };
 }
 
-async function runFollowup(
-  args: unknown,
-  runContext: { context: GradingContext } | undefined,
-  options: EngineGradeOptions,
-  payloadKeys: readonly string[],
-  payloadField: FollowupPayloadField,
-) {
-  const runId = pickStringArg(args, "run_id");
-  if (!runId) {
-    return {
-      message:
-        "Missing run_id. Use the runId from the previous grade_submissions call.",
-    };
-  }
+function malformedEngineResultMessage(toolName: FollowupToolName) {
+  return toolName === "check_similarity"
+    ? "Similarity check returned an invalid engine response. Please run the check again."
+    : "AI detection returned an invalid engine response. Please run the check again.";
+}
 
+function followupFailureMessage(toolName: FollowupToolName, error: unknown) {
+  const detail =
+    error instanceof Error && error.message.trim()
+      ? error.message.trim()
+      : "Unexpected tool error.";
+  return toolName === "check_similarity"
+    ? `Similarity check failed: ${detail}`
+    : `AI detection failed: ${detail}`;
+}
+
+type FollowupToolConfig = {
+  analyze: (runId: string) => Promise<unknown>;
+  description: string;
+  name: FollowupToolName;
+  payloadField: FollowupPayloadField;
+  payloadKeys: readonly string[];
+};
+
+async function runFollowup(
+  runContext: { context: GradingContext } | undefined,
+  config: FollowupToolConfig,
+) {
   const userId = contextUserId(runContext?.context.userId);
-  const loaded = await loadSessionUpload(userId, runId);
+  const loaded = await latestSession(userId);
   if ("error" in loaded) {
     return { message: loaded.error };
   }
+  const { runId, session } = loaded;
 
-  const result = (await runEngineGrade(
-    loaded.session.assignmentName,
-    loaded.file,
-    options,
-  )) as Record<string, unknown>;
+  const rawResult = await config.analyze(runId);
+  if (!isRecord(rawResult)) {
+    return {
+      assignmentName: session.assignmentName,
+      message: malformedEngineResultMessage(config.name),
+      runId,
+      summary: { hasReport: false },
+    };
+  }
+  const result = rawResult;
 
   const now = new Date().toISOString();
   await rememberSession(userId, {
-    ...loaded.session,
-    result,
+    ...session,
+    result: {
+      ...session.result,
+      ...result,
+    },
     updatedAt: now,
   });
 
-  const payload = pickFollowupResult(result, ...payloadKeys);
+  const payload = pickFollowupResult(result, ...config.payloadKeys);
 
   return {
-    [payloadField]: payload,
-    assignmentName: loaded.session.assignmentName,
+    assignmentName: session.assignmentName,
     runId,
-    summary: summarizeFollowupPayload(payloadField, payload),
+    summary: summarizeFollowupPayload(config.payloadField, payload),
   };
 }
 
-export const checkSimilarity = tool<typeof followupSchema, GradingContext>({
+function createFollowupTool(config: FollowupToolConfig) {
+  return tool<typeof followupSchema, GradingContext>({
+    description: config.description,
+    name: config.name,
+    parameters: followupSchema,
+    strict: false,
+    execute: async (_args, runContext) => {
+      try {
+        return await runFollowup(runContext, config);
+      } catch (error) {
+        return {
+          message: followupFailureMessage(config.name, error),
+          runId: null,
+          summary: { hasReport: false },
+        };
+      }
+    },
+    timeoutBehavior: "error_as_result",
+    timeoutMs: 240_000,
+  });
+}
+
+export const checkSimilarity = createFollowupTool({
+  analyze: (runId) => runEngineSimilarityAnalyze(runId),
   description:
-    "Check pairwise similarity across submissions in a previously graded run to spot potential copies.",
+    "Check pairwise similarity across submissions in the latest graded run to spot potential copies.",
   name: "check_similarity",
-  parameters: followupSchema,
-  strict: false,
-  execute: async (args, runContext) =>
-    runFollowup(
-      args,
-      runContext,
-      { includeSimilarity: true },
-      ["similarity", "similarity_report", "similarityReport"],
-      "similarity",
-    ),
-  timeoutBehavior: "error_as_result",
-  timeoutMs: 240_000,
+  payloadField: "similarity",
+  payloadKeys: ["similarity", "similarity_report", "similarityReport"],
 });
 
-export const checkAiDetection = tool<typeof followupSchema, GradingContext>({
+export const checkAiDetection = createFollowupTool({
+  analyze: (runId) => runEngineAiDetectionAnalyze(runId),
   description:
-    "Run an AI-detection pass on submissions in a previously graded run to flag likely AI-generated code.",
+    "Run an AI-detection pass on submissions in the latest graded run to flag likely AI-generated code.",
   name: "check_ai_detection",
-  parameters: followupSchema,
-  strict: false,
-  execute: async (args, runContext) =>
-    runFollowup(
-      args,
-      runContext,
-      { includeAiDetection: true },
-      ["ai_detection", "aiDetection", "ai_detection_report"],
-      "aiDetection",
-    ),
-  timeoutBehavior: "error_as_result",
-  timeoutMs: 240_000,
+  payloadField: "aiDetection",
+  payloadKeys: ["ai_detection", "aiDetection", "ai_detection_report"],
 });
