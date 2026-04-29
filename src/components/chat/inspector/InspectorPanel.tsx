@@ -137,10 +137,22 @@ export function InspectorPanel({
 
   function renderView() {
     if (view === "similarity") {
-      return <ReportSection kind="similarity" report={similarityReport} />;
+      return (
+        <ReportSection
+          kind="similarity"
+          report={similarityReport}
+          students={students}
+        />
+      );
     }
     if (view === "aiDetection") {
-      return <ReportSection kind="aiDetection" report={aiDetectionReport} />;
+      return (
+        <ReportSection
+          kind="aiDetection"
+          report={aiDetectionReport}
+          students={students}
+        />
+      );
     }
     if (!selectedStudent) {
       return null;

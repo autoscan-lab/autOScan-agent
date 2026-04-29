@@ -73,9 +73,23 @@ function compactReplayText(value: string) {
   return `${value.slice(0, maxReplayTextChars)}...[truncated]`;
 }
 
-function hasReportFromSummary(output: Record<string, unknown> | undefined) {
+function numberOf(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function compactSummary(output: Record<string, unknown> | undefined) {
   const summary = recordOf(output?.summary);
-  return typeof summary?.hasReport === "boolean" ? summary.hasReport : undefined;
+  if (!summary) {
+    return undefined;
+  }
+
+  return {
+    flaggedPairs: numberOf(summary.flaggedPairs),
+    flaggedSubmissions: numberOf(summary.flaggedSubmissions),
+    hasReport: typeof summary.hasReport === "boolean" ? summary.hasReport : undefined,
+    pairCount: numberOf(summary.pairCount),
+    submissionCount: numberOf(summary.submissionCount),
+  };
 }
 
 function minimalToolOutput(part: ToolPart, toolName: string) {
@@ -84,27 +98,29 @@ function minimalToolOutput(part: ToolPart, toolName: string) {
   const runId = stringOf(output?.runId) ?? stringOf(input?.run_id);
   const assignmentName =
     stringOf(output?.assignmentName) ?? stringOf(input?.assignment_name);
-  const summaryHasReport = hasReportFromSummary(output);
 
-  if (toolName === "grade_submissions" || toolName === "check_similarity") {
-    const similarity = recordOf(output?.similarity) ?? recordOf(output?.similarity_report);
+  if (toolName === "grade_submissions") {
     return {
       assignmentName: assignmentName ?? null,
-      hasReport:
-        toolName === "check_similarity"
-          ? summaryHasReport ?? Boolean(similarity)
-          : true,
+      hasReport: true,
       runId: runId ?? null,
+      studentCount: numberOf(output?.studentCount) ?? null,
+    };
+  }
+
+  if (toolName === "check_similarity") {
+    return {
+      assignmentName: assignmentName ?? null,
+      runId: runId ?? null,
+      summary: compactSummary(output) ?? null,
     };
   }
 
   if (toolName === "check_ai_detection") {
-    const detection =
-      recordOf(output?.aiDetection) ?? recordOf(output?.ai_detection);
     return {
       assignmentName: assignmentName ?? null,
-      hasReport: summaryHasReport ?? Boolean(detection),
       runId: runId ?? null,
+      summary: compactSummary(output) ?? null,
     };
   }
 
@@ -112,16 +128,6 @@ function minimalToolOutput(part: ToolPart, toolName: string) {
     assignmentName: assignmentName ?? null,
     runId: runId ?? null,
   };
-}
-
-export function extractUiMessageText(message: UIMessage) {
-  const text =
-    message.parts
-      ?.filter(isTextPart)
-      .map((part) => part.text)
-      .join("") ?? "";
-
-  return compactReplayText(text);
 }
 
 function describeFiles(message: UIMessage) {
@@ -138,7 +144,13 @@ function describeFiles(message: UIMessage) {
 }
 
 function messageTextWithFiles(message: UIMessage) {
-  return `${extractUiMessageText(message)}${describeFiles(message)}`.trim();
+  const text =
+    message.parts
+      ?.filter(isTextPart)
+      .map((part) => part.text)
+      .join("") ?? "";
+
+  return `${compactReplayText(text)}${describeFiles(message)}`.trim();
 }
 
 export function extractLatestUserAttachments(

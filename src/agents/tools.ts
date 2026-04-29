@@ -1,51 +1,44 @@
 import { tool } from "@openai/agents";
 
+import { normalizeUserId } from "@/lib/auth";
 import type { UploadedAttachment } from "@/lib/chat/message-converters";
 import {
+  type EngineUpload,
   runEngineAiDetectionAnalyze,
   runEngineGrade,
   runEngineSimilarityAnalyze,
 } from "@/lib/engine/client";
+import { studentsFromResult, type StudentRow } from "@/lib/grading";
 import {
-  studentsFromResult,
-  type StudentRow,
-} from "@/lib/grading";
-import {
-  getLatestRunId,
   getGradingSession,
+  getLatestRunId,
   getStoredFileByKey,
-  saveLatestRunId,
   saveGradingSession,
-  type StoredGradingSession,
+  saveLatestRunId,
   userStorageKey,
 } from "@/lib/storage";
-import { normalizeUserId } from "@/lib/auth";
 
 export type GradingContext = {
   attachments?: UploadedAttachment[];
   userId?: string;
 };
 
-type AttachmentFile = {
-  bytes: Buffer;
-  filename: string;
-  mediaType: string;
-};
-
 type ToolParameter = {
   description?: string;
-  type: "number" | "string";
+  type: "string";
 };
-type NonStrictToolSchema = {
+
+type ToolSchema = {
   additionalProperties: true;
   properties: Record<string, ToolParameter>;
   required: string[];
   type: "object";
 };
+
 type FollowupPayloadField = "similarity" | "aiDetection";
 type FollowupToolName = "check_similarity" | "check_ai_detection";
 
-const gradeSubmissionsSchema: NonStrictToolSchema = {
+const gradeSubmissionsSchema: ToolSchema = {
   additionalProperties: true,
   properties: {
     assignment_name: {
@@ -57,18 +50,16 @@ const gradeSubmissionsSchema: NonStrictToolSchema = {
   type: "object",
 };
 
-const followupSchema: NonStrictToolSchema = {
+const noArgsSchema: ToolSchema = {
   additionalProperties: true,
-  properties: {
-    run_id: {
-      description:
-        "Optional run id. The tool always uses the latest graded run in this chat context.",
-      type: "string",
-    },
-  },
+  properties: {},
   required: [],
   type: "object",
 };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 function pickStringArg(args: unknown, ...keys: string[]) {
   if (!isRecord(args)) {
@@ -77,121 +68,56 @@ function pickStringArg(args: unknown, ...keys: string[]) {
 
   for (const key of keys) {
     const value = args[key];
-    if (typeof value === "string") {
-      const normalized = value.trim();
-      if (normalized) {
-        return normalized;
-      }
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
     }
   }
 
   return undefined;
 }
 
-function pickZipAttachment(
-  attachments: UploadedAttachment[] | undefined,
-): UploadedAttachment | undefined {
-  const candidates = (attachments ?? []).filter(
-    (attachment) =>
-      typeof attachment.url === "string" &&
-      attachment.url.trim() !== "" &&
-      !attachment.url.startsWith("about:blank"),
-  );
-
-  return (
-    [...candidates]
-      .reverse()
-      .find((attachment) =>
-        (attachment.filename ?? attachment.mediaType)
-          .toLowerCase()
-          .includes("zip"),
-      ) ?? candidates.at(-1)
-  );
+function latestAttachment(attachments: UploadedAttachment[] | undefined) {
+  return attachments?.at(-1);
 }
 
-async function attachmentToFile(
+async function r2AttachmentToUpload(
   attachment: UploadedAttachment,
-  userId?: string,
-): Promise<AttachmentFile> {
-  const filename = attachment.filename ?? "submissions.zip";
+  userId: string,
+): Promise<EngineUpload> {
+  const objectKey = attachment.url.startsWith("r2://")
+    ? attachment.url.slice("r2://".length).trim()
+    : "";
 
-  if (attachment.url.startsWith("r2://")) {
-    const objectKey = attachment.url.slice("r2://".length).trim();
-    if (!objectKey) {
-      throw new Error("Uploaded attachment reference is invalid.");
-    }
-
-    const normalizedUserId = normalizeUserId(userId);
-    const expectedUserKey = userStorageKey(normalizedUserId);
-    if (!objectKey.includes(`/${expectedUserKey}/`)) {
-      throw new Error("Uploaded attachment does not belong to this user.");
-    }
-
-    const object = await getStoredFileByKey(objectKey);
-    if (!object) {
-      throw new Error("Uploaded attachment was not found. Please re-upload it.");
-    }
-
-    return {
-      bytes: object.bytes,
-      filename,
-      mediaType: object.contentType ?? attachment.mediaType ?? "application/zip",
-    };
+  if (!objectKey) {
+    throw new Error("Uploaded attachment reference is invalid.");
   }
 
-  if (attachment.url.startsWith("data:")) {
-    const match = /^data:([^;,]+)?(;base64)?,([\s\S]*)$/.exec(attachment.url);
-    if (!match) {
-      throw new Error("Uploaded attachment data URL is invalid.");
-    }
-
-    const mediaType = match[1] || attachment.mediaType || "application/zip";
-    const isBase64 = Boolean(match[2]);
-    const data = match[3];
-    const bytes = isBase64
-      ? Buffer.from(data, "base64")
-      : Buffer.from(decodeURIComponent(data));
-
-    return { bytes, filename, mediaType };
+  const expectedUserKey = userStorageKey(userId);
+  if (!objectKey.includes(`/${expectedUserKey}/`)) {
+    throw new Error("Uploaded attachment does not belong to this user.");
   }
 
-  const response = await fetch(attachment.url, {
-    signal: AbortSignal.timeout(60_000),
-  });
-  if (!response.ok) {
-    throw new Error(`Could not download attachment (${response.status}).`);
+  const object = await getStoredFileByKey(objectKey);
+  if (!object) {
+    throw new Error("Uploaded attachment was not found. Please re-upload it.");
   }
 
-  const mediaType =
-    response.headers.get("content-type") ??
-    attachment.mediaType ??
-    "application/zip";
-  const bytes = Buffer.from(await response.arrayBuffer());
-
-  return { bytes, filename, mediaType };
+  return {
+    bytes: object.bytes,
+    filename: attachment.filename ?? "submissions.zip",
+    mediaType: object.contentType ?? attachment.mediaType ?? "application/zip",
+  };
 }
 
 /** Keep streamed tool output small; the full run is loaded from R2 by run id. */
-function prune(row: StudentRow) {
-  const entries = Object.entries(row).filter(
-    ([key, value]) =>
-      value !== null &&
-      ![
-        "bannedHits",
-        "cFiles",
-        "compileTimeMs",
-        "compileTimeout",
-        "compilerError",
-        "exitCode",
-        "notes",
-        "path",
-        "sourceFiles",
-        "sourceText",
-        "tests",
-        "testsPassed",
-      ].includes(key),
-  );
-  return Object.fromEntries(entries) as Partial<StudentRow>;
+function compactStudent(row: StudentRow) {
+  return {
+    bannedCount: row.bannedCount,
+    compileOk: row.compileOk,
+    grade: row.grade,
+    status: row.status,
+    studentId: row.studentId,
+  };
 }
 
 export const gradeSubmissions = tool<
@@ -212,8 +138,7 @@ export const gradeSubmissions = tool<
       };
     }
 
-    const attachment = pickZipAttachment(runContext?.context.attachments);
-
+    const attachment = latestAttachment(runContext?.context.attachments);
     if (!attachment) {
       return {
         message:
@@ -222,14 +147,9 @@ export const gradeSubmissions = tool<
     }
 
     const userId = normalizeUserId(runContext?.context.userId);
-    const file = await attachmentToFile(attachment, userId);
-    const rawResult = await runEngineGrade(assignmentName, file);
-    if (!isRecord(rawResult)) {
-      return {
-        message: "Grading returned an invalid engine response. Please try again.",
-      };
-    }
-    const runId = pickStringArg(rawResult, "run_id", "runId");
+    const upload = await r2AttachmentToUpload(attachment, userId);
+    const result = await runEngineGrade(assignmentName, upload);
+    const runId = pickStringArg(result, "run_id", "runId");
     if (!runId) {
       return {
         message: "Grading finished but no run_id was returned by the engine.",
@@ -237,23 +157,22 @@ export const gradeSubmissions = tool<
     }
 
     const now = new Date().toISOString();
-
     await saveGradingSession(userId, {
       assignmentName,
       createdAt: now,
       id: runId,
-      result: rawResult,
+      result,
       updatedAt: now,
       uploads: [],
     });
     await saveLatestRunId(userId, runId);
 
-    const students = studentsFromResult(rawResult);
+    const students = studentsFromResult(result);
     return {
       assignmentName,
       runId,
       studentCount: students.length,
-      students: students.map(prune),
+      students: students.map(compactStudent),
     };
   },
   timeoutBehavior: "error_as_result",
@@ -267,6 +186,7 @@ async function latestSession(userId: string) {
       error: "No graded run is available yet. Ask the user to grade first.",
     } as const;
   }
+
   const session = await getGradingSession(userId, runId);
   if (!session) {
     return {
@@ -274,24 +194,8 @@ async function latestSession(userId: string) {
         "The latest graded run is not available in storage. Ask the user to grade again.",
     } as const;
   }
+
   return { runId, session } as const;
-}
-
-function pickFollowupResult(
-  result: Record<string, unknown>,
-  ...keys: string[]
-): unknown {
-  for (const key of keys) {
-    const value = result[key];
-    if (value !== undefined && value !== null) {
-      return value;
-    }
-  }
-  return null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function flaggedCount(values: unknown[]) {
@@ -326,12 +230,6 @@ function summarizeFollowupPayload(
   };
 }
 
-function malformedEngineResultMessage(toolName: FollowupToolName) {
-  return toolName === "check_similarity"
-    ? "Similarity check returned an invalid engine response. Please run the check again."
-    : "AI detection returned an invalid engine response. Please run the check again.";
-}
-
 function followupFailureMessage(toolName: FollowupToolName, error: unknown) {
   const detail =
     error instanceof Error && error.message.trim()
@@ -343,11 +241,11 @@ function followupFailureMessage(toolName: FollowupToolName, error: unknown) {
 }
 
 type FollowupToolConfig = {
-  analyze: (runId: string) => Promise<unknown>;
+  analyze: (runId: string) => Promise<Record<string, unknown>>;
   description: string;
   name: FollowupToolName;
   payloadField: FollowupPayloadField;
-  payloadKeys: readonly string[];
+  payloadKey: string;
 };
 
 async function runFollowup(
@@ -361,39 +259,32 @@ async function runFollowup(
   }
   const { runId, session } = loaded;
 
-  const rawResult = await config.analyze(runId);
-  if (!isRecord(rawResult)) {
-    return {
-      assignmentName: session.assignmentName,
-      message: malformedEngineResultMessage(config.name),
-      runId,
-      summary: { hasReport: false },
-    };
-  }
+  const result = await config.analyze(runId);
   const now = new Date().toISOString();
   await saveGradingSession(userId, {
     ...session,
     result: {
       ...session.result,
-      ...rawResult,
+      ...result,
     },
     updatedAt: now,
   });
 
-  const payload = pickFollowupResult(rawResult, ...config.payloadKeys);
-
   return {
     assignmentName: session.assignmentName,
     runId,
-    summary: summarizeFollowupPayload(config.payloadField, payload),
+    summary: summarizeFollowupPayload(
+      config.payloadField,
+      result[config.payloadKey],
+    ),
   };
 }
 
 function createFollowupTool(config: FollowupToolConfig) {
-  return tool<typeof followupSchema, GradingContext>({
+  return tool<typeof noArgsSchema, GradingContext>({
     description: config.description,
     name: config.name,
-    parameters: followupSchema,
+    parameters: noArgsSchema,
     strict: false,
     execute: async (_args, runContext) => {
       try {
@@ -412,19 +303,20 @@ function createFollowupTool(config: FollowupToolConfig) {
 }
 
 export const checkSimilarity = createFollowupTool({
-  analyze: (runId) => runEngineSimilarityAnalyze(runId, { includeSpans: true, minScore: 40 }),
+  analyze: (runId) =>
+    runEngineSimilarityAnalyze(runId, { includeSpans: true, minScore: 10 }),
   description:
     "Check pairwise similarity across submissions in the latest graded run to spot potential copies.",
   name: "check_similarity",
   payloadField: "similarity",
-  payloadKeys: ["similarity", "similarity_report", "similarityReport"],
+  payloadKey: "similarity",
 });
 
 export const checkAiDetection = createFollowupTool({
-  analyze: (runId) => runEngineAiDetectionAnalyze(runId, { includeSpans: true, minScore: 40 }),
+  analyze: (runId) => runEngineAiDetectionAnalyze(runId, { includeSpans: true }),
   description:
     "Run an AI-detection pass on submissions in the latest graded run to flag likely AI-generated code.",
   name: "check_ai_detection",
   payloadField: "aiDetection",
-  payloadKeys: ["ai_detection", "aiDetection", "ai_detection_report"],
+  payloadKey: "ai_detection",
 });
