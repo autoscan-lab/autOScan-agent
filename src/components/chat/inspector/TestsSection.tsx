@@ -111,17 +111,29 @@ export function TestsSection({ student }: { student: StudentInspectorRow }) {
 
           <div className="min-h-0 flex-1 overflow-auto pt-3">
             {selectedCase.diffLines.length > 0 ? (
-              <pre className="font-mono text-[11px] leading-relaxed text-[var(--foreground)]">
-                {selectedCase.diffLines.map((line, lineIndex) => (
-                  <div
-                    className={diffLineTone(line.type)}
-                    key={`${selectedCase.index}-${line.lineNum ?? lineIndex}-${line.type}-${line.content}`}
-                  >
-                    <span>{diffLinePrefix(line.type)}</span>
-                    <span>{line.content}</span>
+              <div>
+                <pre className="font-mono text-[11px] leading-relaxed text-[var(--foreground)]">
+                  {selectedCase.diffLines.map((line, lineIndex) => (
+                    <div
+                      className={diffLineTone(line.type)}
+                      key={`${selectedCase.index}-${line.lineNum ?? lineIndex}-${line.type}-${line.content}`}
+                    >
+                      <span>{diffLinePrefix(line.type)}</span>
+                      <span>{line.content}</span>
+                    </div>
+                  ))}
+                </pre>
+                {selectedCase.stderr ? (
+                  <div className="mt-4 border-t border-[var(--linear-border-subtle)] pt-3">
+                    <p className="mb-1 text-[11px] font-[560] text-[var(--chat-text-muted)]">
+                      stderr:
+                    </p>
+                    <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-[var(--linear-danger)]">
+                      {selectedCase.stderr}
+                    </pre>
                   </div>
-                ))}
-              </pre>
+                ) : null}
+              </div>
             ) : (
               <pre
                 className={cn(
