@@ -216,6 +216,7 @@ export function AIDictionaryPanel({
             </div>
             <div className="mt-3">
               <TextAreaField
+                className="max-h-56 overflow-y-auto resize-none"
                 label="Code"
                 onChange={(code) => updateEntry({ code })}
                 rows={10}

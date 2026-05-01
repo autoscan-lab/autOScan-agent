@@ -349,7 +349,7 @@ export function PolicyBuilder() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col bg-[var(--linear-bg)] text-[var(--foreground)]">
+    <main className="flex h-screen flex-col overflow-hidden bg-[var(--linear-bg)] text-[var(--foreground)]">
       <header className="sticky top-0 z-20 shrink-0 bg-[#08090a]/90 backdrop-blur-md">
         <div className="flex h-12 items-center gap-3 px-4">
           <Link
@@ -366,13 +366,13 @@ export function PolicyBuilder() {
         </div>
       </header>
 
-      <div className="flex flex-1">
-        <aside className="w-40 shrink-0 px-2 pt-4">
+      <div className="flex min-h-0 flex-1">
+        <aside className="w-40 shrink-0 overflow-y-auto px-2 pt-4">
           <AssignmentRail selected={selected} setSelected={setSelected} />
         </aside>
 
-        <div className="mb-2 mr-2 mt-2 flex flex-1 flex-col rounded-xl border border-white/[0.04] bg-[var(--linear-panel)]">
-          {renderContent()}
+        <div className="mb-2 mr-2 mt-2 flex min-h-0 flex-1 flex-col rounded-xl border border-white/[0.04] bg-[var(--linear-panel)]">
+          <div className="min-h-0 flex-1 overflow-y-auto">{renderContent()}</div>
         </div>
       </div>
     </main>
