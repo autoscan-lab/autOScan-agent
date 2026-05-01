@@ -54,11 +54,11 @@ function InspectorControls({
   }
 
   return (
-    <div className="absolute right-10 top-[3px] z-10 flex items-center gap-2">
+    <div className="absolute right-10 top-[2px] z-10 flex items-center gap-2">
       <DropdownMenu>
-        <DropdownMenuTrigger className="inline-flex h-7 items-center gap-1.5 rounded-md border border-[var(--linear-border)] bg-[#030304]/90 px-2.5 text-[11px] font-[510] text-[var(--chat-text-secondary)] shadow-[var(--shadow-dialog)] backdrop-blur-md transition-colors hover:bg-[#08080a] hover:text-[var(--foreground)]">
+        <DropdownMenuTrigger className="inline-flex h-8 items-center gap-2 rounded-md border border-[var(--linear-border)] bg-[#030304]/90 px-3 text-[12px] font-[510] text-[var(--chat-text-secondary)] shadow-[var(--shadow-dialog)] backdrop-blur-md transition-colors hover:bg-[#08080a] hover:text-[var(--foreground)]">
           {viewLabel(view)}
-          <ChevronDownIcon className="size-3" />
+          <ChevronDownIcon className="size-3.5" />
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="end"
@@ -77,7 +77,7 @@ function InspectorControls({
       </DropdownMenu>
       <span
         aria-hidden
-        className="hidden h-5 w-px bg-[var(--linear-border)] md:block"
+        className="hidden h-6 w-px bg-[var(--linear-border)] md:block"
       />
     </div>
   );
@@ -192,7 +192,7 @@ export function InspectorPanel({
 
           <div
             className={
-              view === "source" || view === "tests"
+              view === "source"
                 ? "min-h-0 flex-1 pb-14 pt-0"
                 : "min-h-0 flex-1 pt-0"
             }
@@ -200,7 +200,7 @@ export function InspectorPanel({
             {renderView()}
           </div>
 
-          {selectedStudent && (view === "source" || view === "tests") ? (
+          {selectedStudent && view === "source" ? (
             <div className="absolute inset-x-0 bottom-0 z-10">
               <StatusDrawer
                 onRevealLine={revealSourceLine}

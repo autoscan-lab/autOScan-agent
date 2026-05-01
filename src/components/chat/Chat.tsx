@@ -414,14 +414,14 @@ export function Chat({
           <button
             aria-expanded={panelOpen}
             aria-label={panelOpen ? "Close inspector" : "Open inspector"}
-            className="pointer-events-auto absolute right-3 top-3 z-20 inline-flex size-7 items-center justify-center rounded-md border border-[var(--linear-border)] bg-[#030304]/90 text-[var(--chat-text-secondary)] shadow-[var(--shadow-dialog)] backdrop-blur-md transition-colors hover:bg-[#08080a] hover:text-[var(--foreground)]"
+            className="pointer-events-auto absolute right-3 top-3 z-20 inline-flex size-8 items-center justify-center rounded-md border border-[var(--linear-border)] bg-[#030304]/90 text-[var(--chat-text-secondary)] shadow-[var(--shadow-dialog)] backdrop-blur-md transition-colors hover:bg-[#08080a] hover:text-[var(--foreground)]"
             onClick={() => setPanelOpen((value) => !value)}
             type="button"
           >
             {panelOpen ? (
-              <PanelRightCloseIcon className="size-3.5" />
+              <PanelRightCloseIcon className="size-4" />
             ) : (
-              <PanelRightOpenIcon className="size-3.5" />
+              <PanelRightOpenIcon className="size-4" />
             )}
           </button>
 

@@ -282,7 +282,7 @@ function DetailHeader({
   title: string;
 }) {
   return (
-    <div className="flex min-h-12 items-center gap-3 border-b border-[var(--linear-border)] px-3 py-2 pr-36">
+    <div className="flex min-h-10 items-center gap-3 border-b border-[var(--linear-border-subtle)] px-3 pr-36">
       <div className="flex min-w-0 items-center gap-2">
         <button
           className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-[var(--linear-border-subtle)] bg-[var(--linear-ghost)] text-[var(--chat-text-secondary)] transition-colors hover:border-[var(--linear-border)] hover:bg-[var(--linear-ghost-hover)] hover:text-[var(--foreground)]"
@@ -478,60 +478,96 @@ function SimilarityTable({
   onSelect: (pair: SimilarityPair) => void;
   pairs: SimilarityPair[];
 }) {
+  const flaggedPairs = pairs.filter((pair) => pair.flagged).length;
+  const averageSimilarity =
+    pairs.length > 0
+      ? Math.round(
+          pairs.reduce((sum, pair) => sum + pair.similarity_percent, 0) /
+            pairs.length,
+        )
+      : 0;
+
   return (
-    <div className="w-full overflow-x-auto">
-      <table className="w-full border-collapse text-[12px]">
-        <thead>
-          <tr className="border-b border-[var(--linear-border)] font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--chat-text-muted)]">
-            <th className="px-4 py-2.5 text-left font-[510]">Student A</th>
-            <th className="px-4 py-2.5 text-left font-[510]">Student B</th>
-            <th className="px-4 py-2.5 text-right font-[510]">Matches</th>
-            <th className="px-4 py-2.5 text-right font-[510]">Similarity</th>
-            <th className="px-4 py-2.5 text-right font-[510]">Flagged</th>
-            <th className="w-10 px-3 py-2.5" />
-          </tr>
-        </thead>
-        <tbody>
-          {pairs.map((pair) => (
-            <tr
-              className="cursor-pointer border-b border-[var(--linear-border-subtle)] text-[13px] transition-colors last:border-b-0 hover:bg-white/[0.035]"
-              key={`${pair.a}-${pair.b}`}
-              onClick={() => onSelect(pair)}
-            >
-              <td className="px-4 py-2.5 font-[560] text-[var(--foreground)]">
-                {studentLabel(pair.a)}
-              </td>
-              <td className="px-4 py-2.5 font-[560] text-[var(--foreground)]">
-                {studentLabel(pair.b)}
-              </td>
-              <td className="px-4 py-2.5 text-right font-mono text-[var(--chat-text-muted)]">
-                {pair.matches?.length ?? 0}
-              </td>
-              <td
-                className={cn(
-                  "px-4 py-2.5 text-right font-mono font-[650]",
-                  scoreTone(pair.flagged, pair.similarity_percent / 100),
-                )}
-              >
-                {`${Math.round(pair.similarity_percent)}%`}
-              </td>
-              <td
-                className={cn(
-                  "px-4 py-2.5 text-right font-[560]",
-                  pair.flagged
-                    ? "text-[var(--linear-danger)]"
-                    : "text-[var(--chat-text-muted)]",
-                )}
-              >
-                {pair.flagged ? "Yes" : "No"}
-              </td>
-              <td className="px-3 py-2.5 text-right text-[var(--chat-text-muted)]">
-                <ChevronRightIcon className="ml-auto size-3.5" />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="mx-auto w-full max-w-[1024px] px-4 pb-4">
+      <div className="grid shrink-0 gap-2 sm:grid-cols-3">
+        <div className="rounded-md border border-[var(--linear-border-subtle)] bg-[var(--linear-surface)] px-3 py-2">
+          <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--chat-text-muted)]">
+            Pairs
+          </p>
+          <p className="mt-1 font-mono text-[14px] text-[var(--foreground)]">
+            {pairs.length}
+          </p>
+        </div>
+        <div className="rounded-md border border-[var(--linear-border-subtle)] bg-[var(--linear-surface)] px-3 py-2">
+          <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--chat-text-muted)]">
+            Flagged
+          </p>
+          <p className="mt-1 font-mono text-[14px] text-[var(--linear-danger)]">
+            {flaggedPairs}
+          </p>
+        </div>
+        <div className="rounded-md border border-[var(--linear-border-subtle)] bg-[var(--linear-surface)] px-3 py-2">
+          <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--chat-text-muted)]">
+            Avg Similarity
+          </p>
+          <p className="mt-1 font-mono text-[14px] text-[var(--foreground)]">
+            {averageSimilarity}%
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 overflow-hidden rounded-md border border-[var(--linear-border-subtle)] bg-[var(--linear-surface)]">
+        <div className="w-full overflow-auto">
+          <table className="w-full border-collapse [border-radius:0] text-[12px]">
+            <thead>
+              <tr className="border-b border-[var(--linear-border)] text-[12px] text-[var(--chat-text-muted)]">
+                <th className="px-4 py-2 text-left font-[510]">Student A</th>
+                <th className="px-4 py-2 text-left font-[510]">Student B</th>
+                <th className="px-4 py-2 text-right font-[510]">Similarity</th>
+                <th className="px-4 py-2 text-right font-[510]">Flagged</th>
+                <th className="w-10 px-3 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {pairs.map((pair) => (
+                <tr
+                  className="cursor-pointer border-b border-[var(--linear-border-subtle)] text-[13px] transition-colors last:border-b-0 hover:bg-white/[0.035]"
+                  key={`${pair.a}-${pair.b}`}
+                  onClick={() => onSelect(pair)}
+                >
+                  <td className="px-4 py-2.5 font-[560] text-[var(--foreground)]">
+                    {studentLabel(pair.a)}
+                  </td>
+                  <td className="px-4 py-2.5 font-[560] text-[var(--foreground)]">
+                    {studentLabel(pair.b)}
+                  </td>
+                  <td
+                    className={cn(
+                      "px-4 py-2.5 text-right font-mono font-[650]",
+                      scoreTone(pair.flagged, pair.similarity_percent / 100),
+                    )}
+                  >
+                    {`${Math.round(pair.similarity_percent)}%`}
+                  </td>
+                  <td
+                    className={cn(
+                      "px-4 py-2.5 text-right font-[560]",
+                      pair.flagged
+                        ? "text-[var(--linear-danger)]"
+                        : "text-[var(--chat-text-muted)]",
+                    )}
+                  >
+                    {pair.flagged ? "Yes" : "No"}
+                  </td>
+                  <td className="px-3 py-2.5 text-right text-[var(--chat-text-muted)]">
+                    <ChevronRightIcon className="ml-auto size-3.5" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
@@ -543,58 +579,95 @@ function AIDetectionTable({
   onSelect: (submission: AIDetectionSubmission) => void;
   submissions: AIDetectionSubmission[];
 }) {
+  const flagged = submissions.filter((submission) => submission.flagged).length;
+  const scoredSubmissions = submissions.filter(
+    (submission) => !submission.parse_error,
+  );
+  const averageScore =
+    scoredSubmissions.length > 0
+      ? scoredSubmissions.reduce((sum, submission) => sum + submission.best_score, 0) /
+        scoredSubmissions.length
+      : 0;
+
   return (
-    <div className="w-full overflow-x-auto">
-      <table className="w-full border-collapse text-[12px]">
-        <thead>
-          <tr className="border-b border-[var(--linear-border)] font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--chat-text-muted)]">
-            <th className="px-4 py-2.5 text-left font-[510]">Student</th>
-            <th className="px-4 py-2.5 text-right font-[510]">Matches</th>
-            <th className="px-4 py-2.5 text-right font-[510]">AI score</th>
-            <th className="px-4 py-2.5 text-right font-[510]">Flagged</th>
-            <th className="w-10 px-3 py-2.5" />
-          </tr>
-        </thead>
-        <tbody>
-          {submissions.map((submission) => (
-            <tr
-              className="cursor-pointer border-b border-[var(--linear-border-subtle)] text-[13px] transition-colors last:border-b-0 hover:bg-white/[0.035]"
-              key={submission.id}
-              onClick={() => onSelect(submission)}
-            >
-              <td className="px-4 py-2.5 font-[560] text-[var(--foreground)]">
-                {studentLabel(submission.id)}
-              </td>
-              <td className="px-4 py-2.5 text-right font-mono text-[var(--chat-text-muted)]">
-                {submission.match_count ?? submission.matches?.length ?? 0}
-              </td>
-              <td
-                className={cn(
-                  "px-4 py-2.5 text-right font-mono font-[650]",
-                  submission.parse_error
-                    ? "text-[var(--linear-danger)]"
-                    : scoreTone(submission.flagged, submission.best_score),
-                )}
-              >
-                {submission.parse_error ? "Error" : percent(submission.best_score)}
-              </td>
-              <td
-                className={cn(
-                  "px-4 py-2.5 text-right font-[560]",
-                  submission.parse_error || submission.flagged
-                    ? "text-[var(--linear-danger)]"
-                    : "text-[var(--chat-text-muted)]",
-                )}
-              >
-                {submission.parse_error ? "Error" : submission.flagged ? "Yes" : "No"}
-              </td>
-              <td className="px-3 py-2.5 text-right text-[var(--chat-text-muted)]">
-                <ChevronRightIcon className="ml-auto size-3.5" />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="mx-auto w-full max-w-[1024px] px-4 pb-4">
+      <div className="grid shrink-0 gap-2 sm:grid-cols-3">
+        <div className="rounded-md border border-[var(--linear-border-subtle)] bg-[var(--linear-surface)] px-3 py-2">
+          <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--chat-text-muted)]">
+            Submissions
+          </p>
+          <p className="mt-1 font-mono text-[14px] text-[var(--foreground)]">
+            {submissions.length}
+          </p>
+        </div>
+        <div className="rounded-md border border-[var(--linear-border-subtle)] bg-[var(--linear-surface)] px-3 py-2">
+          <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--chat-text-muted)]">
+            Flagged
+          </p>
+          <p className="mt-1 font-mono text-[14px] text-[var(--linear-danger)]">
+            {flagged}
+          </p>
+        </div>
+        <div className="rounded-md border border-[var(--linear-border-subtle)] bg-[var(--linear-surface)] px-3 py-2">
+          <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--chat-text-muted)]">
+            Avg Score
+          </p>
+          <p className="mt-1 font-mono text-[14px] text-[var(--foreground)]">
+            {percent(averageScore)}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 overflow-hidden rounded-md border border-[var(--linear-border-subtle)] bg-[var(--linear-surface)]">
+        <div className="w-full overflow-auto">
+          <table className="w-full border-collapse [border-radius:0] text-[12px]">
+            <thead>
+              <tr className="border-b border-[var(--linear-border)] text-[12px] text-[var(--chat-text-muted)]">
+                <th className="px-4 py-2 text-left font-[510]">Student</th>
+                <th className="px-4 py-2 text-right font-[510]">AI score</th>
+                <th className="px-4 py-2 text-right font-[510]">Flagged</th>
+                <th className="w-10 px-3 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {submissions.map((submission) => (
+                <tr
+                  className="cursor-pointer border-b border-[var(--linear-border-subtle)] text-[13px] transition-colors last:border-b-0 hover:bg-white/[0.035]"
+                  key={submission.id}
+                  onClick={() => onSelect(submission)}
+                >
+                  <td className="px-4 py-2.5 font-[560] text-[var(--foreground)]">
+                    {studentLabel(submission.id)}
+                  </td>
+                  <td
+                    className={cn(
+                      "px-4 py-2.5 text-right font-mono font-[650]",
+                      submission.parse_error
+                        ? "text-[var(--linear-danger)]"
+                        : scoreTone(submission.flagged, submission.best_score),
+                    )}
+                  >
+                    {submission.parse_error ? "Error" : percent(submission.best_score)}
+                  </td>
+                  <td
+                    className={cn(
+                      "px-4 py-2.5 text-right font-[560]",
+                      submission.flagged
+                        ? "text-[var(--linear-danger)]"
+                        : "text-[var(--chat-text-muted)]",
+                    )}
+                  >
+                    {submission.flagged ? "Yes" : "No"}
+                  </td>
+                  <td className="px-3 py-2.5 text-right text-[var(--chat-text-muted)]">
+                    <ChevronRightIcon className="ml-auto size-3.5" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
@@ -642,7 +715,7 @@ export function ReportSection({
       );
     }
     return (
-      <section className="no-scrollbar h-full min-h-0 overflow-auto pt-10 pb-10">
+      <section className="no-scrollbar h-full min-h-0 overflow-auto pt-10 pb-4">
         {similarity.pairs.length === 0 ? (
           <EmptyReport>
             No submission pairs met the similarity threshold.
@@ -677,7 +750,7 @@ export function ReportSection({
     );
   }
   return (
-    <section className="no-scrollbar h-full min-h-0 overflow-auto pt-10 pb-10">
+    <section className="no-scrollbar h-full min-h-0 overflow-auto pt-10 pb-4">
       {detection.submissions.length === 0 ? (
         <EmptyReport>No students were returned by AI detection.</EmptyReport>
       ) : (
