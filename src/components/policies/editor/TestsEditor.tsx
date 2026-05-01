@@ -25,10 +25,7 @@ export function TestsEditor({
   }
 
   function parseArgs(value: string) {
-    return value
-      .split(/\s+/)
-      .map((arg) => arg.trim())
-      .filter(Boolean);
+    return value.split(" ").map((arg) => arg.trim());
   }
 
   function addTest() {
@@ -50,32 +47,39 @@ export function TestsEditor({
   }
 
   return (
-    <div className="rounded-xl border border-white/[0.04] bg-[var(--linear-surface)]">
-      <div className="flex items-center gap-0.5 overflow-x-auto border-b border-white/[0.03] px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {tests.map((test, index) => (
+    <div
+      className={cn(
+        "rounded-xl bg-[var(--linear-surface)]",
+        tests.length > 0 ? "border border-white/[0.04]" : "",
+      )}
+    >
+      {tests.length > 0 ? (
+        <div className="flex items-center gap-0.5 overflow-x-auto border-b border-white/[0.03] px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {tests.map((test, index) => (
+            <button
+              className={cn(
+                "shrink-0 rounded-md px-3 py-1.5 text-[12px] font-[510] whitespace-nowrap transition-colors",
+                index === activeIndex
+                  ? "bg-white/[0.07] text-[var(--foreground)]"
+                  : "text-[var(--chat-text-muted)] hover:bg-white/[0.04] hover:text-[var(--chat-text-secondary)]",
+              )}
+              key={index}
+              onClick={() => setSelectedIndex(index)}
+              type="button"
+            >
+              {test.name || "Untitled test"}
+            </button>
+          ))}
           <button
-            className={cn(
-              "shrink-0 rounded-md px-3 py-1.5 text-[12px] font-[510] whitespace-nowrap transition-colors",
-              index === activeIndex
-                ? "bg-white/[0.07] text-[var(--foreground)]"
-                : "text-[var(--chat-text-muted)] hover:bg-white/[0.04] hover:text-[var(--chat-text-secondary)]",
-            )}
-            key={index}
-            onClick={() => setSelectedIndex(index)}
+            aria-label="Add test"
+            className="ml-1 flex size-7 shrink-0 items-center justify-center rounded-md text-[var(--chat-text-muted)] transition-colors hover:bg-white/[0.04] hover:text-[var(--foreground)]"
+            onClick={addTest}
             type="button"
           >
-            {test.name || "Untitled test"}
+            <PlusIcon className="size-3.5" />
           </button>
-        ))}
-        <button
-          aria-label="Add test"
-          className="ml-1 flex size-7 shrink-0 items-center justify-center rounded-md text-[var(--chat-text-muted)] transition-colors hover:bg-white/[0.04] hover:text-[var(--foreground)]"
-          onClick={addTest}
-          type="button"
-        >
-          <PlusIcon className="size-3.5" />
-        </button>
-      </div>
+        </div>
+      ) : null}
 
       {tests.length === 0 ? (
         <div className="flex flex-col items-center gap-3 px-6 py-10 text-center">

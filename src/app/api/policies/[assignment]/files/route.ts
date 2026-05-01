@@ -1,15 +1,28 @@
 import { auth } from "@/auth";
 import { policyAssignments } from "@/lib/policies/types";
 import { deleteStoredFileByKey, putStoredFileByKey } from "@/lib/storage";
-import { safeObjectFilename, storagePrefix } from "@/lib/storage";
+import { safeObjectFilename } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
 const maxFileBytes = 5 * 1024 * 1024;
 
-function policyFileKey(assignment: string, filename: string) {
-  const prefix = storagePrefix();
-  return `${prefix}/policies/${assignment}/files/${filename}`;
+type PolicyFileKind = "library" | "test";
+
+function parsePolicyFileKind(value: unknown): PolicyFileKind | null {
+  if (value === "library" || value === "test") {
+    return value;
+  }
+  return null;
+}
+
+function policyFileKey(
+  assignment: string,
+  kind: PolicyFileKind,
+  filename: string,
+) {
+  const directory = kind === "library" ? "libraries" : "test_files";
+  return `assignments/${assignment}/${directory}/${filename}`;
 }
 
 export async function POST(
@@ -27,6 +40,10 @@ export async function POST(
   }
 
   const formData = await request.formData().catch(() => null);
+  const kind = parsePolicyFileKind(formData?.get("kind"));
+  if (!kind) {
+    return new Response("Invalid file kind.", { status: 400 });
+  }
   const file = formData?.get("file");
   if (!(file instanceof File)) {
     return new Response("Missing file.", { status: 400 });
@@ -38,7 +55,7 @@ export async function POST(
   const filename = safeObjectFilename(file.name, "file");
   const bytes = Buffer.from(await file.arrayBuffer());
   await putStoredFileByKey(
-    policyFileKey(assignment, filename),
+    policyFileKey(assignment, kind, filename),
     bytes,
     file.type || "application/octet-stream",
   );
@@ -61,12 +78,16 @@ export async function DELETE(
   }
 
   const body = await request.json().catch(() => null);
+  const kind = parsePolicyFileKind(body?.kind);
+  if (!kind) {
+    return new Response("Invalid file kind.", { status: 400 });
+  }
   const filename = typeof body?.filename === "string" ? body.filename.trim() : "";
   const safeFilename = safeObjectFilename(filename, "");
   if (!safeFilename) {
     return new Response("Invalid filename.", { status: 400 });
   }
 
-  await deleteStoredFileByKey(policyFileKey(assignment, safeFilename));
+  await deleteStoredFileByKey(policyFileKey(assignment, kind, safeFilename));
   return Response.json({ ok: true });
 }

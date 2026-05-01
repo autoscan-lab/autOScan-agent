@@ -18,7 +18,7 @@ function flagsValue(flags: string[]) {
 }
 
 function parseFlags(value: string) {
-  return value.split(/\s+/).map((flag) => flag.trim()).filter(Boolean);
+  return value.split(" ").map((flag) => flag.trim());
 }
 
 export function PolicyEditor({
@@ -92,6 +92,7 @@ export function PolicyEditor({
         <div className="grid gap-4 md:grid-cols-2">
           <PolicyFileEditor
             assignment={assignment}
+            fileKind="library"
             label="Library files"
             onChange={(libraryFiles) =>
               onPolicyChange({ ...policy, libraryFiles })
@@ -100,6 +101,7 @@ export function PolicyEditor({
           />
           <PolicyFileEditor
             assignment={assignment}
+            fileKind="test"
             label="Test files"
             onChange={(testFiles) => onPolicyChange({ ...policy, testFiles })}
             values={policy.testFiles}

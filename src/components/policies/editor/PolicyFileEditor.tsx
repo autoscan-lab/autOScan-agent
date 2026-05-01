@@ -8,11 +8,13 @@ import { fieldClass, labelClass } from "../shared/form-controls";
 
 export function PolicyFileEditor({
   assignment,
+  fileKind,
   label,
   onChange,
   values,
 }: {
   assignment: PolicyAssignment;
+  fileKind: "library" | "test";
   label: string;
   onChange: (values: string[]) => void;
   values: string[];
@@ -30,6 +32,7 @@ export function PolicyFileEditor({
     try {
       const formData = new FormData();
       formData.set("file", file);
+      formData.set("kind", fileKind);
 
       const res = await fetch(`/api/policies/${assignment}/files`, {
         body: formData,
@@ -55,7 +58,7 @@ export function PolicyFileEditor({
   async function removeFile(filename: string) {
     onChange(values.filter((f) => f !== filename));
     await fetch(`/api/policies/${assignment}/files`, {
-      body: JSON.stringify({ filename }),
+      body: JSON.stringify({ filename, kind: fileKind }),
       headers: { "Content-Type": "application/json" },
       method: "DELETE",
     }).catch(() => {});
@@ -63,45 +66,50 @@ export function PolicyFileEditor({
 
   return (
     <div className="space-y-2">
-      <div className={labelClass()}>{label}</div>
+      <div className="flex items-center justify-between gap-3">
+        <div className={labelClass()}>{label}</div>
+        <button
+          className="inline-flex h-7 items-center gap-1.5 rounded-md border border-white/[0.05] bg-white/[0.02] px-2.5 text-[12px] font-[510] text-[var(--chat-text-secondary)] transition-colors hover:border-white/[0.08] hover:bg-white/[0.04] hover:text-[var(--foreground)] disabled:opacity-50"
+          disabled={uploading}
+          onClick={() => inputRef.current?.click()}
+          type="button"
+        >
+          <UploadIcon className="size-3" />
+          {uploading ? "Uploading..." : "Upload file"}
+        </button>
+      </div>
 
-      {values.length > 0 && (
-        <div className="grid gap-2 md:grid-cols-2">
-          {values.map((filename) => (
-            <div className="relative" key={filename}>
-              <div
-                className={fieldClass(
-                  "flex h-8 w-full items-center rounded-lg px-2.5 pr-7",
-                )}
-              >
-                <span className="truncate text-[13px]">{filename}</span>
+      <div className="rounded-lg border border-white/[0.04] bg-white/[0.01] p-3">
+        {values.length > 0 ? (
+          <div className="grid gap-2 md:grid-cols-2">
+            {values.map((filename) => (
+              <div className="relative" key={filename}>
+                <div
+                  className={fieldClass(
+                    "flex h-8 w-full items-center rounded-lg px-2.5 pr-7",
+                  )}
+                >
+                  <span className="truncate text-[13px]">{filename}</span>
+                </div>
+                <button
+                  aria-label="Remove"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 flex size-5 items-center justify-center rounded text-[var(--chat-text-muted)] transition-colors hover:text-[var(--linear-danger)]"
+                  onClick={() => void removeFile(filename)}
+                  type="button"
+                >
+                  ×
+                </button>
               </div>
-              <button
-                aria-label="Remove"
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 flex size-5 items-center justify-center rounded text-[var(--chat-text-muted)] transition-colors hover:text-[var(--linear-danger)]"
-                onClick={() => void removeFile(filename)}
-                type="button"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        ) : (
+          <p className="text-[12px] text-[var(--chat-text-muted)]">No files yet.</p>
+        )}
+      </div>
 
       {error ? (
         <p className="text-[12px] text-[var(--linear-danger)]">{error}</p>
       ) : null}
-
-      <button
-        className="inline-flex h-7 items-center gap-1.5 rounded-md border border-white/[0.05] bg-white/[0.02] px-2.5 text-[12px] font-[510] text-[var(--chat-text-secondary)] transition-colors hover:border-white/[0.08] hover:bg-white/[0.04] hover:text-[var(--foreground)] disabled:opacity-50"
-        disabled={uploading}
-        onClick={() => inputRef.current?.click()}
-        type="button"
-      >
-        <UploadIcon className="size-3" />
-        {uploading ? "Uploading..." : "Upload file"}
-      </button>
 
       <input
         className="hidden"
