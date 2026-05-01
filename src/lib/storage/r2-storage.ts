@@ -256,6 +256,66 @@ export async function getStoredFileByKey(key: string) {
   };
 }
 
+export async function getStoredTextByKey(key: string) {
+  const file = await getStoredFileByKey(key);
+  return file ? file.bytes.toString("utf8") : undefined;
+}
+
+export async function putStoredTextByKey(
+  key: string,
+  value: string,
+  contentType = "text/plain; charset=utf-8",
+) {
+  const normalizedKey = key.trim().replace(/^\/+/, "");
+  if (!normalizedKey) {
+    throw new Error("Storage key is required.");
+  }
+
+  await putObject(normalizedKey, value, contentType);
+}
+
+export async function putStoredFileByKey(
+  key: string,
+  bytes: Buffer,
+  contentType: string,
+) {
+  const normalizedKey = key.trim().replace(/^\/+/, "");
+  if (!normalizedKey) {
+    throw new Error("Storage key is required.");
+  }
+
+  await putObject(normalizedKey, bytes, contentType);
+}
+
+export async function listStoredKeysByPrefix(prefix: string) {
+  const normalizedPrefix = prefix.trim().replace(/^\/+/, "");
+  if (!normalizedPrefix) {
+    return [];
+  }
+
+  const keys: string[] = [];
+  let continuationToken: string | undefined;
+  do {
+    const listed = await r2Client().send(
+      new ListObjectsV2Command({
+        Bucket: bucketName(),
+        ContinuationToken: continuationToken,
+        Prefix: normalizedPrefix,
+      }),
+    );
+
+    for (const object of listed.Contents ?? []) {
+      if (object.Key) {
+        keys.push(object.Key);
+      }
+    }
+
+    continuationToken = listed.NextContinuationToken;
+  } while (continuationToken);
+
+  return keys;
+}
+
 export async function deleteStoredFileByKey(key: string) {
   const normalizedKey = key.trim().replace(/^\/+/, "");
   if (!normalizedKey) {

@@ -3,6 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import type { FileUIPart, UIMessage } from "ai";
 import {
+  FileCogIcon,
   LogOutIcon,
   PanelRightCloseIcon,
   PanelRightOpenIcon,
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -61,6 +63,7 @@ export function Chat({
   userImage,
   userName,
 }: ChatProps) {
+  const router = useRouter();
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [isClearingHistory, setIsClearingHistory] = useState(false);
@@ -280,6 +283,10 @@ export function Chat({
                 ) : null}
               </div>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push("/policies")}>
+                <FileCogIcon />
+                Policy builder
+              </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={
                   isModelBusy || isClearingHistory || messageList.length === 0

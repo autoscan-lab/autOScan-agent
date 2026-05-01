@@ -73,8 +73,8 @@
   --linear-success-strong: #27a644;
   --linear-danger: #ef6a73;
   --linear-warning: #b09000;
-  --linear-border: rgba(255, 255, 255, 0.08);
-  --linear-border-subtle: rgba(255, 255, 255, 0.05);
+  --linear-border: rgba(255, 255, 255, 0.05);
+  --linear-border-subtle: rgba(255, 255, 255, 0.03);
   --linear-border-solid: #23252a;
   --linear-ghost: rgba(255, 255, 255, 0.02);
   --linear-ghost-hover: rgba(255, 255, 255, 0.05);

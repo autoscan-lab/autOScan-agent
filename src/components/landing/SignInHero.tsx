@@ -78,7 +78,7 @@ export function SignInHero({ mode = "sign-in" }: SignInHeroProps) {
               ) : (
                 <button
                   className="inline-flex w-full items-center justify-center gap-2.5 rounded-full border border-[#d9d9d9] bg-white px-5 py-3 text-sm font-semibold text-black transition hover:bg-[#f7f7f7] sm:w-auto"
-                  onClick={() => void signIn("google", { redirectTo: "/" })}
+                  onClick={() => void signIn("google", { redirectTo: "/chat" })}
                   type="button"
                 >
                   <svg aria-hidden="true" className="size-5" viewBox="0 0 24 24">
