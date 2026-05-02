@@ -219,7 +219,7 @@ export function DittoThinking({
   }
 
   const lastVerb = cyclingVerbs[lastVerbIndex] ?? cyclingVerbs[0];
-  const label = `${lastVerb.past} ${formatElapsed(elapsedMs)}`;
+  const label = `${lastVerb.past} for ${formatElapsed(elapsedMs)}`;
 
   return (
     <span className="flex items-center gap-2 overflow-visible">

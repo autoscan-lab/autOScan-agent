@@ -352,7 +352,7 @@ export function Chat({
         >
           <Conversation className="relative z-10 flex-1">
             <ConversationContent
-              className="mx-auto w-full max-w-[var(--chat-column-w)] gap-6 px-3 pb-44 pt-6 md:px-6"
+              className="mx-auto w-full max-w-[var(--chat-column-w)] gap-6 px-3 pb-6 pt-6 md:px-6"
             >
               <ChatMessages
                 isModelBusy={isModelBusy}
@@ -382,27 +382,23 @@ export function Chat({
             <ConversationScrollButton />
           </Conversation>
 
-          <div
-            className="pointer-events-none absolute inset-x-0 bottom-0 z-10"
-          >
-            <div className="px-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6 md:pb-5">
-              <div className="pointer-events-auto mx-auto w-full max-w-[var(--chat-column-w)]">
-                {attachmentError ? (
-                  <p className="mb-2 text-xs text-[var(--linear-danger)]">
-                    {attachmentError}
-                  </p>
-                ) : null}
+          <div className="px-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:px-6 md:pb-5">
+            <div className="mx-auto w-full max-w-[var(--chat-column-w)]">
+              {attachmentError ? (
+                <p className="mb-2 text-xs text-[var(--linear-danger)]">
+                  {attachmentError}
+                </p>
+              ) : null}
 
-                <ZipPromptInput
-                  accept={zipAcceptAttr}
-                  busy={isModelBusy}
-                  maxFileSize={maxZipUploadBytes}
-                  onError={setAttachmentError}
-                  onStop={stop}
-                  onSubmit={handlePromptSubmit}
-                  onUploadFile={uploadAttachment}
-                />
-              </div>
+              <ZipPromptInput
+                accept={zipAcceptAttr}
+                busy={isModelBusy}
+                maxFileSize={maxZipUploadBytes}
+                onError={setAttachmentError}
+                onStop={stop}
+                onSubmit={handlePromptSubmit}
+                onUploadFile={uploadAttachment}
+              />
             </div>
           </div>
         </section>
