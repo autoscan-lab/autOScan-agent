@@ -121,6 +121,42 @@ function MessageHistory({
   );
 }
 
+function CollapsedPillButton({
+  isModelBusy,
+  onClick,
+  statusText,
+}: {
+  isModelBusy: boolean;
+  onClick?: () => void;
+  statusText: string;
+}) {
+  return (
+    <button
+      className="flex h-full w-full items-center gap-3 px-5 text-left"
+      onClick={onClick}
+      tabIndex={onClick ? 0 : -1}
+      type="button"
+    >
+      <span
+        className={cn(
+          "size-2 shrink-0 rounded-full transition-colors",
+          isModelBusy
+            ? "animate-pulse bg-[var(--linear-accent)]"
+            : "bg-[var(--linear-success)]",
+        )}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-[510] text-[var(--foreground)]">
+          {statusText}
+        </span>
+      </span>
+      <span className="shrink-0 text-[11px] text-[var(--chat-text-muted)]">
+        Ask
+      </span>
+    </button>
+  );
+}
+
 export function AgentBar(props: AgentBarProps) {
   const {
     attachmentError,
@@ -140,7 +176,7 @@ export function AgentBar(props: AgentBarProps) {
   } = props;
 
   const [pillState, setPillState] = useState<PillState>("collapsed");
-  const [portalMounted, setPortalMounted] = useState(false);
+  const portalRoot = typeof document === "undefined" ? null : document.body;
   const expandedRef = useRef<HTMLDivElement>(null);
   const promptProps = {
     attachmentError,
@@ -151,11 +187,12 @@ export function AgentBar(props: AgentBarProps) {
     onUploadFile,
   };
 
-  useEffect(() => { setPortalMounted(true); }, []);
-
-  // Collapse pill whenever the detail state toggles so the position
-  // transition always starts from the 360px collapsed width.
-  useEffect(() => { setPillState("collapsed"); }, [detailOpen]);
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setPillState("collapsed");
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [detailOpen, layoutState]);
 
   useEffect(() => {
     if (pillState !== "expanded") return;
@@ -167,77 +204,44 @@ export function AgentBar(props: AgentBarProps) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [pillState]);
 
-  if (layoutState !== "results") {
-    return (
-      <div
-        className={cn(
-          "flex min-h-0 flex-col items-center px-4 transition-all duration-[360ms] ease-[cubic-bezier(0.22,1,0.36,1)]",
-          layoutState === "empty"
-            ? "basis-[54%] shrink-0 justify-end pb-5 pt-2"
-            : "h-[500px] shrink-0 justify-end pb-5 pt-2",
-        )}
-      >
-        <div
-          className={cn(
-            "flex w-full max-w-[56rem] flex-col overflow-hidden rounded-2xl bg-[var(--linear-panel)]",
-            "h-full",
-            cardShadow,
-          )}
-        >
-          <Conversation className="relative flex-1">
-            <ConversationContent className="gap-5 px-5 pb-3 pt-5">
-              <MessageHistory
-                className="gap-5"
-                error={error}
-                isModelBusy={isModelBusy}
-                messages={messages}
-                onElapsedSettled={onElapsedSettled}
-                runtimeError={runtimeError}
-                userName={userName}
-              />
-            </ConversationContent>
-            <ConversationScrollButton />
-          </Conversation>
-
-          <PromptComposer className="px-4 pb-4" {...promptProps} />
-        </div>
-      </div>
-    );
-  }
-
   const statusText = isModelBusy
     ? "Thinking..."
     : panelData
       ? `${panelData.assignmentName ?? "Graded"} · ${panelData.students.length} students`
       : "Ready";
+  const isResultsLayout = layoutState === "results";
   const isExpanded = pillState === "expanded";
-  const expandedWidth = "w-[min(42rem,calc(100vw-2rem))]";
+  const placeholderClassName = cn(
+    "shrink-0 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+    isResultsLayout
+      ? "pb-5 pt-2"
+      : layoutState === "empty"
+        ? "basis-[54%] pb-5 pt-2"
+        : "h-[500px] pb-5 pt-2",
+  );
+  const placeholderHeightClassName = isResultsLayout ? "h-12" : "h-full";
 
-  // The pill is always portaled to document.body to escape <main>'s z-10 stacking
-  // context, ensuring it sits above the DetailDrawer curtain (z-50) at z-60.
-  //
-  // Position is driven entirely by translateX on a left:50% anchor:
-  //   centered  → translateX(-50%)              pill center at 50vw
-  //   bottom-right → translateX(calc(50vw-376px)) right edge 16px from viewport right
-  //
-  // CSS transitions between these two values because both resolve to px offsets,
-  // giving the slide animation when the detail drawer opens/closes.
   return (
     <>
-      {/* Flow placeholder keeps ResultsPane from filling the full height */}
-      <div aria-hidden className="shrink-0 pb-5 pt-2">
-        <div className="h-12" />
+      <div aria-hidden className={placeholderClassName}>
+        <div className={placeholderHeightClassName} />
       </div>
 
-      {portalMounted && createPortal(
+      {portalRoot && createPortal(
         <div
           className={cn(
-            "fixed bottom-5 z-[60] will-change-transform",
-            "transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+            "fixed bottom-5 left-1/2 z-[60] px-4 will-change-transform",
+            "transition-[width,height,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+            isResultsLayout
+              ? isExpanded
+                ? "h-[360px] w-[min(44rem,100vw)]"
+                : "h-12 w-full max-w-[392px]"
+              : layoutState === "empty"
+                ? "h-[calc(54vh-1.75rem)] w-full max-w-[58rem]"
+                : "h-[min(500px,calc(100vh-2rem))] w-full max-w-[58rem]",
           )}
           style={{
-            left: "50%",
-            transform: detailOpen
+            transform: isResultsLayout && detailOpen
               ? "translateX(calc(50vw - 1rem - 100%))"
               : "translateX(-50%)",
           }}
@@ -245,25 +249,49 @@ export function AgentBar(props: AgentBarProps) {
           <div
             ref={expandedRef}
             className={cn(
-              "overflow-hidden transition-[width,height,border-radius,scale,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform",
+              "h-full overflow-hidden transition-[width,height,border-radius,scale,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform",
               "bg-[var(--linear-panel)]",
               cardShadow,
-              detailOpen ? "origin-bottom-right" : "origin-center",
-              isExpanded ? cn("h-[360px] rounded-2xl", expandedWidth) : "w-[360px] rounded-[28px]",
-              pillState === "collapsed"
-                ? "h-12 duration-300"
-                : pillState === "hover"
-                  ? "h-12 scale-[1.08] duration-[480ms]"
-                  : "h-[360px]",
+              isResultsLayout && detailOpen ? "origin-bottom-right" : "origin-center",
+              isResultsLayout
+                ? cn(
+                  isExpanded
+                    ? "h-[360px] w-full rounded-2xl"
+                    : "h-12 w-full rounded-[28px]",
+                  pillState === "hover" && "scale-[1.08] duration-[480ms]",
+                )
+                : "w-full rounded-2xl",
             )}
             onMouseEnter={() => {
-              if (pillState === "collapsed") setPillState("hover");
+              if (isResultsLayout && pillState === "collapsed") {
+                setPillState("hover");
+              }
             }}
             onMouseLeave={() => {
-              if (pillState === "hover") setPillState("collapsed");
+              if (isResultsLayout && pillState === "hover") {
+                setPillState("collapsed");
+              }
             }}
           >
-            {isExpanded ? (
+            {!isResultsLayout ? (
+              <div className="grid h-full grid-rows-[minmax(0,1fr)_auto]">
+                <Conversation className="relative flex-1">
+                  <ConversationContent className="gap-5 px-5 pb-3 pt-5">
+                    <MessageHistory
+                      className="gap-5"
+                      error={error}
+                      isModelBusy={isModelBusy}
+                      messages={messages}
+                      onElapsedSettled={onElapsedSettled}
+                      runtimeError={runtimeError}
+                      userName={userName}
+                    />
+                  </ConversationContent>
+                  <ConversationScrollButton />
+                </Conversation>
+                <PromptComposer className="px-4 pb-4" {...promptProps} />
+              </div>
+            ) : isExpanded ? (
               <div className="grid h-full grid-rows-[minmax(0,1fr)_auto]">
                 <div className="no-scrollbar min-h-0 overflow-y-auto overscroll-contain px-4 pb-2 pt-3">
                   <MessageHistory
@@ -276,32 +304,15 @@ export function AgentBar(props: AgentBarProps) {
                 <PromptComposer className="shrink-0 px-3 pb-3" {...promptProps} />
               </div>
             ) : (
-              <button
-                className="flex h-full w-full items-center gap-3 px-5 text-left"
+              <CollapsedPillButton
+                isModelBusy={isModelBusy}
                 onClick={() => setPillState("expanded")}
-                type="button"
-              >
-                <span
-                  className={cn(
-                    "size-2 shrink-0 rounded-full transition-colors",
-                    isModelBusy
-                      ? "animate-pulse bg-[var(--linear-accent)]"
-                      : "bg-[var(--linear-success)]",
-                  )}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-[510] text-[var(--foreground)]">
-                    {statusText}
-                  </span>
-                </span>
-                <span className="shrink-0 text-[11px] text-[var(--chat-text-muted)]">
-                  Ask
-                </span>
-              </button>
+                statusText={statusText}
+              />
             )}
           </div>
         </div>,
-        document.body,
+        portalRoot,
       )}
     </>
   );

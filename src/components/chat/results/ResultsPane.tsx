@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 import type {
+  DetailSelection,
   GradingRunResponse,
   StudentResultRow,
   ToolReport,
@@ -110,27 +111,36 @@ function NotRunHint({ tool }: { tool: "similarity" | "AI detection" }) {
 
 export function ResultsPane({
   aiDetectionReport,
+  detailSelection,
   layoutState,
+  onSelectDetail,
   panelData,
   panelError,
   panelLoading,
-  selectedStudentId,
-  setSelectedStudentId,
   similarityReport,
 }: {
   aiDetectionReport: ToolReport | null;
+  detailSelection: DetailSelection;
   layoutState: LayoutState;
+  onSelectDetail: (selection: Exclude<DetailSelection, null>) => void;
   panelData: GradingRunResponse | null;
   panelError: string | null;
   panelLoading: boolean;
-  selectedStudentId: string | null;
-  setSelectedStudentId: (id: string | null) => void;
   similarityReport: ToolReport | null;
 }) {
   const students = useMemo<StudentResultRow[]>(
     () => panelData?.students ?? [],
     [panelData?.students],
   );
+  const selectedStudentId = detailSelection?.kind === "student"
+    ? detailSelection.id
+    : null;
+  const selectedSimilarityPairId = detailSelection?.kind === "similarity"
+    ? detailSelection.id
+    : null;
+  const selectedAiDetectionId = detailSelection?.kind === "aiDetection"
+    ? detailSelection.id
+    : null;
 
   const [tab, setTab] = useState<ResultsTab>("grading");
 
@@ -167,17 +177,31 @@ export function ResultsPane({
               {tab === "grading" ? (
                 <GradingTable
                   selectedStudentId={selectedStudentId}
-                  setSelectedStudentId={setSelectedStudentId}
+                  setSelectedStudentId={(id) => {
+                    if (id) onSelectDetail({ id, kind: "student" });
+                  }}
                   students={students}
                 />
               ) : tab === "similarity" ? (
                 similarityReport ? (
-                  <SimilarityTable report={similarityReport} />
+                  <SimilarityTable
+                    onRowSelect={(pair) => {
+                      onSelectDetail({ id: pair.id, kind: "similarity" });
+                    }}
+                    report={similarityReport}
+                    selectedId={selectedSimilarityPairId}
+                  />
                 ) : (
                   <NotRunHint tool="similarity" />
                 )
               ) : aiDetectionReport ? (
-                <AIDetectionTable report={aiDetectionReport} />
+                <AIDetectionTable
+                  onRowSelect={(submission) => {
+                    onSelectDetail({ id: submission.id, kind: "aiDetection" });
+                  }}
+                  report={aiDetectionReport}
+                  selectedId={selectedAiDetectionId}
+                />
               ) : (
                 <NotRunHint tool="AI detection" />
               )}
@@ -187,7 +211,6 @@ export function ResultsPane({
           <EmptyState />
         )}
       </div>
-
     </div>
   );
 }

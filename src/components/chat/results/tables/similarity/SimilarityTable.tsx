@@ -1,49 +1,13 @@
 import type { ToolReport } from "@/components/chat/shared/types";
 import { formatStudentName } from "@/components/chat/shared/display";
+import {
+  similarityReportOf,
+  type SimilarityPair,
+} from "@/components/chat/shared/tool-reports";
 import { EmptyReport, ResultsTable } from "../ResultsTable";
-
-type SimilarityPair = {
-  a: string;
-  b: string;
-  flagged: boolean;
-  similarity_percent: number;
-};
-
-type SimilarityReport = {
-  pairs: SimilarityPair[];
-  source_file: string;
-};
 
 const similarityTemplate =
   "minmax(10rem,1.4fr) minmax(10rem,1.4fr) minmax(7rem,0.7fr) minmax(6rem,0.6fr)";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isNumber(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value);
-}
-
-function reportOf(payload: unknown): SimilarityReport | null {
-  if (!isRecord(payload)) return null;
-  if (typeof payload.source_file !== "string" || !Array.isArray(payload.pairs)) {
-    return null;
-  }
-  if (
-    !payload.pairs.every(
-      (pair) =>
-        isRecord(pair) &&
-        typeof pair.a === "string" &&
-        typeof pair.b === "string" &&
-        typeof pair.flagged === "boolean" &&
-        isNumber(pair.similarity_percent),
-    )
-  ) {
-    return null;
-  }
-  return { pairs: payload.pairs, source_file: payload.source_file };
-}
 
 export function SimilarityTable({
   onRowSelect,
@@ -56,7 +20,7 @@ export function SimilarityTable({
 }) {
   if (!report) return <EmptyReport>No report has been returned yet.</EmptyReport>;
 
-  const similarity = reportOf(report.payload);
+  const similarity = similarityReportOf(report);
   if (!similarity) {
     return (
       <EmptyReport>
@@ -94,7 +58,7 @@ export function SimilarityTable({
         },
       ]}
       onRowSelect={onRowSelect}
-      rows={similarity.pairs.map((pair) => ({ ...pair, id: `${pair.a}-${pair.b}` }))}
+      rows={similarity.pairs}
       selectedId={selectedId}
       template={similarityTemplate}
     />

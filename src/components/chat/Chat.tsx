@@ -9,11 +9,18 @@ import { AccountMenu } from "@/components/chat/account/AccountMenu";
 import { AgentBar } from "@/components/chat/agent/AgentBar";
 import { ResultsPane } from "@/components/chat/results/ResultsPane";
 import type { LayoutState } from "@/components/chat/results/ResultsPane";
+import { AIDetectionDetail } from "@/components/chat/results/drawer/ai-detection/AIDetectionDetail";
+import { SimilarityDetail } from "@/components/chat/results/drawer/similarity/SimilarityDetail";
 import { StudentDetail } from "@/components/chat/results/drawer/student/StudentDetail";
+import {
+  selectedAiDetectionSubmission,
+  selectedSimilarityPair,
+} from "@/components/chat/shared/tool-reports";
 import { useGradingPanel } from "@/hooks/useGradingPanel";
 import { usePersistentChat } from "@/hooks/usePersistentChat";
 import type {
   ChatProps,
+  DetailSelection,
   UploadResponse,
   ZipPromptMessage,
 } from "@/components/chat/shared/types";
@@ -66,8 +73,6 @@ export function Chat({
     panelError,
     panelLoading,
     resetPanel,
-    selectedStudentId,
-    setSelectedStudentId,
     similarityReport,
   } = useGradingPanel(messageList);
 
@@ -77,18 +82,44 @@ export function Chat({
       ? "active"
       : "empty";
   const students = useMemo(() => panelData?.students ?? [], [panelData?.students]);
+  const [detailSelection, setDetailSelection] = useState<DetailSelection>(null);
+  const selectedStudentId = detailSelection?.kind === "student"
+    ? detailSelection.id
+    : null;
+  const selectedSimilarityPairId = detailSelection?.kind === "similarity"
+    ? detailSelection.id
+    : null;
+  const selectedAiDetectionId = detailSelection?.kind === "aiDetection"
+    ? detailSelection.id
+    : null;
   const selectedStudent = useMemo(
     () => students.find((student) => student.studentId === selectedStudentId) ?? null,
     [selectedStudentId, students],
   );
+  const selectedSimilarity = useMemo(
+    () => selectedSimilarityPair(similarityReport, selectedSimilarityPairId),
+    [selectedSimilarityPairId, similarityReport],
+  );
+  const selectedAiDetection = useMemo(
+    () => selectedAiDetectionSubmission(aiDetectionReport, selectedAiDetectionId),
+    [aiDetectionReport, selectedAiDetectionId],
+  );
+  const selectedAiDetectionStudent = useMemo(
+    () => students.find((student) => student.studentId === selectedAiDetectionId) ?? null,
+    [selectedAiDetectionId, students],
+  );
 
-  // Separate from selectedStudent so the pill can start its return animation
-  // at the same moment the curtain starts closing, not after it finishes.
+  const detailIsVisible = Boolean(
+    selectedStudent || selectedSimilarity || selectedAiDetection,
+  );
   const [detailOpenForPill, setDetailOpenForPill] = useState(false);
-  const handleDetailOpen = useCallback((id: string | null) => {
-    if (id !== null) setDetailOpenForPill(true);
-    setSelectedStudentId(id);
-  }, [setSelectedStudentId]);
+  const openDetail = useCallback((selection: Exclude<DetailSelection, null>) => {
+    setDetailSelection(selection);
+    setDetailOpenForPill(true);
+  }, []);
+  const closeDetail = useCallback(() => {
+    setDetailSelection(null);
+  }, []);
   const handleDetailCloseStart = useCallback(() => {
     setDetailOpenForPill(false);
   }, []);
@@ -128,6 +159,8 @@ export function Chat({
     setRuntimeError(null);
     setAttachmentError(null);
     resetPanel();
+    setDetailSelection(null);
+    setDetailOpenForPill(false);
     resetPersistenceDigest();
   }, [resetPanel, resetPersistenceDigest, setMessages]);
 
@@ -226,17 +259,17 @@ export function Chat({
       <main className="relative z-10 flex min-h-0 flex-1 flex-col">
         <ResultsPane
           aiDetectionReport={aiDetectionReport}
+          detailSelection={detailSelection}
           layoutState={layoutState}
+          onSelectDetail={openDetail}
           panelData={panelData}
           panelError={panelError}
           panelLoading={panelLoading}
-          selectedStudentId={selectedStudentId}
-          setSelectedStudentId={handleDetailOpen}
           similarityReport={similarityReport}
         />
         <AgentBar
           attachmentError={attachmentError}
-          detailOpen={detailOpenForPill}
+          detailOpen={detailOpenForPill && detailIsVisible}
           error={error}
           isModelBusy={isModelBusy}
           layoutState={layoutState}
@@ -252,11 +285,25 @@ export function Chat({
         />
         {selectedStudent ? (
           <StudentDetail
-            onClose={() => setSelectedStudentId(null)}
+            onClose={closeDetail}
             onCloseStart={handleDetailCloseStart}
-            onNavigate={handleDetailOpen}
+            onNavigate={(id) => openDetail({ id, kind: "student" })}
             student={selectedStudent}
             students={students}
+          />
+        ) : selectedSimilarity ? (
+          <SimilarityDetail
+            onClose={closeDetail}
+            onCloseStart={handleDetailCloseStart}
+            pair={selectedSimilarity}
+            students={students}
+          />
+        ) : selectedAiDetection ? (
+          <AIDetectionDetail
+            onClose={closeDetail}
+            onCloseStart={handleDetailCloseStart}
+            student={selectedAiDetectionStudent}
+            submission={selectedAiDetection}
           />
         ) : null}
       </main>

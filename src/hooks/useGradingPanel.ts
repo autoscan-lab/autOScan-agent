@@ -252,9 +252,6 @@ export function useGradingPanel(messages: UIMessage[]) {
   const [panelData, setPanelData] = useState<GradingRunResponse | null>(
     cachedPanelData,
   );
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(
-    null,
-  );
 
   const loadedRunId = useRef<string | null>(
     cachedPanelData ? currentRun?.runId ?? null : null,
@@ -286,14 +283,6 @@ export function useGradingPanel(messages: UIMessage[]) {
       gradingRunCache.set(runId, payload);
       loadedRunId.current = runId;
       setPanelData(payload);
-
-      setSelectedStudentId((current) => {
-        if (current === null) return null;
-        const exists = payload.students.some(
-          (student) => student.studentId === current,
-        );
-        return exists ? current : null;
-      });
     } catch (refreshError) {
       setPanelError(
         refreshError instanceof Error
@@ -353,7 +342,6 @@ export function useGradingPanel(messages: UIMessage[]) {
     setPanelLoading(false);
     setPanelError(null);
     setPanelData(null);
-    setSelectedStudentId(null);
     loadedRunId.current = null;
     openedToolCallId.current = null;
     gradingRunCache.clear();
@@ -366,8 +354,6 @@ export function useGradingPanel(messages: UIMessage[]) {
     panelError,
     panelLoading,
     resetPanel,
-    selectedStudentId,
-    setSelectedStudentId,
     similarityReport: similarityReport ?? fallbackSimilarityReport,
   };
 }

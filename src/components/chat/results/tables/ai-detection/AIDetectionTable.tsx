@@ -1,61 +1,13 @@
 import type { ToolReport } from "@/components/chat/shared/types";
 import { formatStudentName } from "@/components/chat/shared/display";
+import {
+  aiDetectionReportOf,
+  type AIDetectionSubmission,
+} from "@/components/chat/shared/tool-reports";
 import { EmptyReport, ResultsTable } from "../ResultsTable";
-
-type AIDetectionSubmission = {
-  best_score: number;
-  flagged: boolean;
-  id: string;
-  match_count?: number;
-  parse_error?: string;
-};
-
-type AIDetectionReport = {
-  dictionary_entry_count: number;
-  dictionary_usable: number;
-  source_file: string;
-  submissions: AIDetectionSubmission[];
-};
 
 const aiDetectionTemplate =
   "minmax(10rem,1.6fr) minmax(7rem,0.7fr) minmax(6rem,0.6fr)";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isNumber(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value);
-}
-
-function reportOf(payload: unknown): AIDetectionReport | null {
-  if (!isRecord(payload)) return null;
-  if (
-    typeof payload.source_file !== "string" ||
-    !isNumber(payload.dictionary_entry_count) ||
-    !isNumber(payload.dictionary_usable) ||
-    !Array.isArray(payload.submissions)
-  ) {
-    return null;
-  }
-  if (
-    !payload.submissions.every(
-      (submission) =>
-        isRecord(submission) &&
-        typeof submission.id === "string" &&
-        typeof submission.flagged === "boolean" &&
-        isNumber(submission.best_score),
-    )
-  ) {
-    return null;
-  }
-  return {
-    dictionary_entry_count: payload.dictionary_entry_count,
-    dictionary_usable: payload.dictionary_usable,
-    source_file: payload.source_file,
-    submissions: payload.submissions,
-  };
-}
 
 export function AIDetectionTable({
   onRowSelect,
@@ -68,7 +20,7 @@ export function AIDetectionTable({
 }) {
   if (!report) return <EmptyReport>No report has been returned yet.</EmptyReport>;
 
-  const detection = reportOf(report.payload);
+  const detection = aiDetectionReportOf(report);
   if (!detection) {
     return (
       <EmptyReport>

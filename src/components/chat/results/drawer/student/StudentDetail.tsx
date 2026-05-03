@@ -1,12 +1,13 @@
 "use client";
 
-import { ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { useState } from "react";
 
 import { cn } from "@/lib/utils";
 import type { StudentResultRow } from "@/components/chat/shared/types";
 import { formatStudentName } from "@/components/chat/shared/display";
 import { DetailDrawer } from "../DetailDrawer";
+import { DetailHeader } from "../DetailHeader";
 import { SourceSection } from "./SourceSection";
 import { BannedSection, CompileSection } from "./StatusSection";
 import { TestsSection } from "./TestsSection";
@@ -42,16 +43,7 @@ export function StudentDetail({
     <DetailDrawer onClose={onClose} onCloseStart={onCloseStart}>
       {(close) => (
         <>
-          <div className="flex h-10 shrink-0 items-center gap-2 border-b border-[var(--linear-border-subtle)] px-3">
-            <button
-              aria-label="Back to table"
-              className="inline-flex size-7 items-center justify-center rounded-md text-[var(--chat-text-secondary)] transition-colors hover:bg-[var(--linear-ghost)] hover:text-[var(--foreground)]"
-              onClick={close}
-              type="button"
-            >
-              <ArrowLeftIcon className="size-3.5" />
-            </button>
-
+          <DetailHeader onBack={close}>
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <span className="truncate text-[13px] font-[510] text-[var(--foreground)]">
                 {formatStudentName(student.studentId)}
@@ -102,7 +94,7 @@ export function StudentDetail({
                 </button>
               ))}
             </div>
-          </div>
+          </DetailHeader>
 
           <div className="relative min-h-0 flex-1">
             {tab === "source" ? (

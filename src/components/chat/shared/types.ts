@@ -9,6 +9,10 @@ export type ChatProps = {
   userName?: string | null;
 };
 
+export type DetailSelection =
+  | { id: string; kind: "aiDetection" | "similarity" | "student" }
+  | null;
+
 export type UploadResponse = {
   filename?: string;
   mediaType?: string;

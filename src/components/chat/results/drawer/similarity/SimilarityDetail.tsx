@@ -1,12 +1,82 @@
+import { formatStudentName } from "@/components/chat/shared/display";
+import type { StudentResultRow } from "@/components/chat/shared/types";
+import type { SimilarityPair } from "@/components/chat/shared/tool-reports";
 import { DetailDrawer } from "../DetailDrawer";
+import { DetailHeader } from "../DetailHeader";
+import { SourceCodePanel } from "../SourceCodePanel";
 
-export function SimilarityDetail({ onClose }: { onClose: () => void }) {
+function sourceFor(studentId: string, students: StudentResultRow[]) {
+  return students.find((student) => student.studentId === studentId) ?? null;
+}
+
+function SourceComparePanel({
+  label,
+  student,
+}: {
+  label: string;
+  student: StudentResultRow | null;
+}) {
   return (
-    <DetailDrawer onClose={onClose}>
-      {() => (
-        <div className="flex h-full items-center justify-center text-[13px]">
-          Similarity detail
-        </div>
+    <section className="flex min-h-0 flex-col border-r border-[var(--linear-border-subtle)] last:border-r-0">
+      <div className="flex h-9 shrink-0 items-center justify-between gap-3 border-b border-[var(--linear-border-subtle)] px-3">
+        <span className="truncate text-[12px] font-[510] text-[var(--foreground)]">
+          {label}
+        </span>
+        {student?.path ? (
+          <span className="truncate font-mono text-[10.5px] text-[var(--chat-text-muted)]">
+            {student.path}
+          </span>
+        ) : null}
+      </div>
+      <SourceCodePanel className="flex-1" code={student?.sourceText} />
+    </section>
+  );
+}
+
+export function SimilarityDetail({
+  onClose,
+  onCloseStart,
+  pair,
+  students,
+}: {
+  onClose: () => void;
+  onCloseStart?: () => void;
+  pair: SimilarityPair;
+  students: StudentResultRow[];
+}) {
+  const studentA = sourceFor(pair.a, students);
+  const studentB = sourceFor(pair.b, students);
+
+  return (
+    <DetailDrawer onClose={onClose} onCloseStart={onCloseStart}>
+      {(close) => (
+        <>
+          <DetailHeader onBack={close}>
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="truncate text-[13px] font-[510] text-[var(--foreground)]">
+                {formatStudentName(pair.a)} / {formatStudentName(pair.b)}
+              </span>
+              <span className="shrink-0 rounded bg-[var(--linear-ghost)] px-2 py-0.5 font-mono text-[11px] text-[var(--chat-text-secondary)]">
+                {Math.round(pair.similarity_percent)}%
+              </span>
+              {pair.flagged ? (
+                <span className="shrink-0 rounded bg-[var(--linear-danger)]/12 px-2 py-0.5 text-[11px] font-[510] text-[var(--linear-danger)]">
+                  Flagged
+                </span>
+              ) : null}
+            </div>
+          </DetailHeader>
+          <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-2">
+            <SourceComparePanel
+              label={formatStudentName(pair.a)}
+              student={studentA}
+            />
+            <SourceComparePanel
+              label={formatStudentName(pair.b)}
+              student={studentB}
+            />
+          </div>
+        </>
       )}
     </DetailDrawer>
   );

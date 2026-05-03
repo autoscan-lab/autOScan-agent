@@ -15,18 +15,19 @@ export function DetailDrawer({
   onClose: () => void;
   onCloseStart?: () => void;
 }) {
-  const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
+  const portalRoot = typeof document === "undefined" ? null : document.body;
 
   useEffect(() => {
-    setMounted(true);
-    // Double rAF: ensures the initial -translate-y-full state is painted
-    // before the transition fires, so the curtain drop is visible.
+    // Let the closed state paint once before the curtain drops in.
+    let inner: number | undefined;
     const outer = window.requestAnimationFrame(() => {
-      const inner = window.requestAnimationFrame(() => setVisible(true));
-      return inner;
+      inner = window.requestAnimationFrame(() => setVisible(true));
     });
-    return () => window.cancelAnimationFrame(outer);
+    return () => {
+      window.cancelAnimationFrame(outer);
+      if (inner !== undefined) window.cancelAnimationFrame(inner);
+    };
   }, []);
 
   function close() {
@@ -35,7 +36,7 @@ export function DetailDrawer({
     window.setTimeout(onClose, 500);
   }
 
-  if (!mounted) return null;
+  if (!portalRoot) return null;
 
   return createPortal(
     <div
@@ -47,6 +48,6 @@ export function DetailDrawer({
     >
       {children(close)}
     </div>,
-    document.body,
+    portalRoot,
   );
 }
