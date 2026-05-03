@@ -5,7 +5,7 @@ import { formatStudentName } from "@/components/chat/shared/display";
 import { ResultsTable } from "../ResultsTable";
 
 const gradingTemplate =
-  "minmax(10rem,1.7fr) minmax(6rem,0.8fr) minmax(6rem,0.8fr) minmax(6rem,0.8fr) minmax(10rem,1.4fr)";
+  "minmax(10rem,1.6fr) minmax(7rem,0.8fr) minmax(6rem,0.7fr) minmax(6rem,0.7fr) minmax(7rem,0.7fr)";
 
 function testsLabel(student: StudentResultRow) {
   return student.tests
@@ -33,6 +33,20 @@ function CompilesStatus({ student }: { student: StudentResultRow }) {
   return <span>—</span>;
 }
 
+function statusLabel(status: string | null) {
+  return status ?? "unknown";
+}
+
+function statusClassName(status: string | null) {
+  if (status === "clean") {
+    return "text-[var(--linear-success)]";
+  }
+  if (status === "banned" || status === "failed") {
+    return "text-[var(--linear-danger)]";
+  }
+  return "text-[var(--chat-text-muted)]";
+}
+
 export function GradingTable({
   selectedStudentId,
   setSelectedStudentId,
@@ -55,8 +69,17 @@ export function GradingTable({
           ),
         },
         {
+          key: "status",
+          label: "Status",
+          render: (student) => (
+            <span className={statusClassName(student.status)}>
+              {statusLabel(student.status)}
+            </span>
+          ),
+        },
+        {
           key: "compiles",
-          label: "Compiles",
+          label: "Compile",
           render: (student) => <CompilesStatus student={student} />,
         },
         {
@@ -65,14 +88,9 @@ export function GradingTable({
           render: (student) => <span>{testsLabel(student)}</span>,
         },
         {
-          key: "grade",
-          label: "Grade",
-          render: (student) => <span>{student.grade ?? "—"}</span>,
-        },
-        {
-          key: "feedback",
-          label: "Feedback",
-          render: () => <span>—</span>,
+          key: "banned",
+          label: "Banned",
+          render: (student) => <span>{student.bannedCount ?? 0}</span>,
         },
       ]}
       onRowSelect={(student) => setSelectedStudentId(student.studentId)}

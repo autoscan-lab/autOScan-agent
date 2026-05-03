@@ -19,8 +19,8 @@ export type LayoutState = "empty" | "active" | "results";
 type ResultsTab = "grading" | "similarity" | "aiDetection";
 
 const columnTemplate =
-  "minmax(10rem,1.7fr) minmax(6rem,0.8fr) minmax(6rem,0.8fr) minmax(6rem,0.8fr) minmax(10rem,1.4fr)";
-const columnHeaders = ["Student", "Compiles", "Tests", "Grade", "Feedback"];
+  "minmax(10rem,1.6fr) minmax(7rem,0.8fr) minmax(6rem,0.7fr) minmax(6rem,0.7fr) minmax(7rem,0.7fr)";
+const columnHeaders = ["Student", "Status", "Compile", "Tests", "Banned"];
 const resultTabs: Array<{ id: ResultsTab; label: string }> = [
   { id: "grading", label: "Grading" },
   { id: "similarity", label: "Similarity" },

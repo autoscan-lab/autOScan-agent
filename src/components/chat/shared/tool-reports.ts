@@ -1,11 +1,18 @@
 import type { ToolReport } from "@/components/chat/shared/types";
 
+export type ToolCodeSpan = {
+  endLine: number;
+  startLine: number;
+};
+
 export type SimilarityPair = {
   a: string;
   b: string;
   flagged: boolean;
   id: string;
   similarity_percent: number;
+  spansA: ToolCodeSpan[];
+  spansB: ToolCodeSpan[];
 };
 
 export type SimilarityReport = {
@@ -17,13 +24,11 @@ export type AIDetectionSubmission = {
   best_score: number;
   flagged: boolean;
   id: string;
-  match_count?: number;
   parse_error?: string;
+  spans: ToolCodeSpan[];
 };
 
 export type AIDetectionReport = {
-  dictionary_entry_count: number;
-  dictionary_usable: number;
   source_file: string;
   submissions: AIDetectionSubmission[];
 };
@@ -36,12 +41,46 @@ function isNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function optionalNumber(value: unknown) {
-  return isNumber(value) ? value : undefined;
-}
-
 function optionalString(value: unknown) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function spanOf(value: unknown): ToolCodeSpan | null {
+  if (!isRecord(value) || !isNumber(value.start_line) || !isNumber(value.end_line)) {
+    return null;
+  }
+
+  return {
+    endLine: Math.max(1, Math.floor(value.end_line)),
+    startLine: Math.max(1, Math.floor(value.start_line)),
+  };
+}
+
+function spansFrom(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((span) => {
+    const parsed = spanOf(span);
+    return parsed ? [parsed] : [];
+  });
+}
+
+function similaritySpans(pair: Record<string, unknown>, key: "spans_a" | "spans_b") {
+  if (!Array.isArray(pair.matches)) return [];
+
+  return pair.matches.flatMap((match) => {
+    if (!isRecord(match)) return [];
+    return spansFrom(match[key]);
+  });
+}
+
+function aiDetectionSpans(submission: Record<string, unknown>) {
+  if (!Array.isArray(submission.matches)) return [];
+
+  return submission.matches.flatMap((match) => {
+    if (!isRecord(match)) return [];
+    return spansFrom(match.spans);
+  });
 }
 
 export function similarityPairId(pair: Pick<SimilarityPair, "a" | "b">) {
@@ -73,6 +112,8 @@ export function similarityReportOf(report: ToolReport | null): SimilarityReport 
       flagged: pair.flagged,
       id: similarityPairId({ a: pair.a, b: pair.b }),
       similarity_percent: pair.similarity_percent,
+      spansA: similaritySpans(pair, "spans_a"),
+      spansB: similaritySpans(pair, "spans_b"),
     }];
   });
 
@@ -119,19 +160,14 @@ export function aiDetectionReportOf(
         best_score: submission.best_score,
         flagged: submission.flagged,
         id: submission.id,
-        match_count: optionalNumber(submission.match_count),
         parse_error: optionalString(submission.parse_error),
+        spans: aiDetectionSpans(submission),
       }];
     },
   );
 
   return submissions.length === payload.submissions.length
-    ? {
-      dictionary_entry_count: payload.dictionary_entry_count,
-      dictionary_usable: payload.dictionary_usable,
-      source_file: payload.source_file,
-      submissions,
-    }
+    ? { source_file: payload.source_file, submissions }
     : null;
 }
 

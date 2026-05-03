@@ -33,6 +33,11 @@ interface KeyedLine {
   key: string;
 }
 
+export type CodeHighlightRange = {
+  endLine: number;
+  startLine: number;
+};
+
 const addKeysToTokens = (lines: ThemedToken[][]): KeyedLine[] =>
   lines.map((line, lineIdx) => ({
     key: `line-${lineIdx}`,
@@ -77,33 +82,42 @@ const LINE_NUMBER_CLASSES = cn(
 
 // Line rendering component
 const LineSpan = ({
+  highlightedLineRanges,
   highlightedLine,
   keyedLine,
   lineIdPrefix,
   lineNumber,
   showLineNumbers,
 }: {
+  highlightedLineRanges?: CodeHighlightRange[];
   highlightedLine?: number;
   keyedLine: KeyedLine;
   lineIdPrefix?: string;
   lineNumber: number;
   showLineNumbers: boolean;
-}) => (
-  <span
-    className={cn(
-      showLineNumbers ? LINE_NUMBER_CLASSES : "block",
-      highlightedLine === lineNumber && "bg-[var(--linear-accent)]/12",
-    )}
-    data-code-line={lineNumber}
-    id={lineIdPrefix ? `${lineIdPrefix}-${lineNumber}` : undefined}
-  >
-    {keyedLine.tokens.length === 0
-      ? "\n"
-      : keyedLine.tokens.map(({ token, key }) => (
-          <TokenSpan key={key} token={token} />
-        ))}
-  </span>
-);
+}) => {
+  const inRange = highlightedLineRanges?.some(
+    (range) => lineNumber >= range.startLine && lineNumber <= range.endLine,
+  );
+
+  return (
+    <span
+      className={cn(
+        showLineNumbers ? LINE_NUMBER_CLASSES : "block",
+        (highlightedLine === lineNumber || inRange) &&
+          "bg-[var(--linear-accent)]/16 shadow-[inset_2px_0_0_var(--linear-accent)]",
+      )}
+      data-code-line={lineNumber}
+      id={lineIdPrefix ? `${lineIdPrefix}-${lineNumber}` : undefined}
+    >
+      {keyedLine.tokens.length === 0
+        ? "\n"
+        : keyedLine.tokens.map(({ token, key }) => (
+            <TokenSpan key={key} token={token} />
+          ))}
+    </span>
+  );
+};
 
 interface TokenizedCode {
   tokens: ThemedToken[][];
@@ -231,12 +245,14 @@ const CodeBlockBody = memo(
   ({
     tokenized,
     showLineNumbers,
+    highlightedLineRanges,
     highlightedLine,
     lineIdPrefix,
     className,
   }: {
     tokenized: TokenizedCode;
     showLineNumbers: boolean;
+    highlightedLineRanges?: CodeHighlightRange[];
     highlightedLine?: number;
     lineIdPrefix?: string;
     className?: string;
@@ -270,6 +286,7 @@ const CodeBlockBody = memo(
         >
           {keyedLines.map((keyedLine, index) => (
             <LineSpan
+              highlightedLineRanges={highlightedLineRanges}
               highlightedLine={highlightedLine}
               key={keyedLine.key}
               keyedLine={keyedLine}
@@ -285,6 +302,7 @@ const CodeBlockBody = memo(
   (prevProps, nextProps) =>
     prevProps.tokenized === nextProps.tokenized &&
     prevProps.showLineNumbers === nextProps.showLineNumbers &&
+    prevProps.highlightedLineRanges === nextProps.highlightedLineRanges &&
     prevProps.highlightedLine === nextProps.highlightedLine &&
     prevProps.lineIdPrefix === nextProps.lineIdPrefix &&
     prevProps.className === nextProps.className
@@ -294,12 +312,14 @@ CodeBlockBody.displayName = "CodeBlockBody";
 
 export const CodeBlockContent = ({
   code,
+  highlightedLineRanges,
   highlightedLine,
   language,
   lineIdPrefix,
   showLineNumbers = false,
 }: {
   code: string;
+  highlightedLineRanges?: CodeHighlightRange[];
   highlightedLine?: number;
   language: BundledLanguage;
   lineIdPrefix?: string;
@@ -343,6 +363,7 @@ export const CodeBlockContent = ({
   return (
     <div className="relative overflow-auto">
       <CodeBlockBody
+        highlightedLineRanges={highlightedLineRanges}
         highlightedLine={highlightedLine}
         lineIdPrefix={lineIdPrefix}
         showLineNumbers={showLineNumbers}

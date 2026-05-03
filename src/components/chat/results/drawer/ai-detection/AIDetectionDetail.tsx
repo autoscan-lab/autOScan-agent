@@ -3,26 +3,7 @@ import type { StudentResultRow } from "@/components/chat/shared/types";
 import type { AIDetectionSubmission } from "@/components/chat/shared/tool-reports";
 import { DetailDrawer } from "../DetailDrawer";
 import { DetailHeader } from "../DetailHeader";
-import { SourceCodePanel } from "../SourceCodePanel";
-
-function Stat({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-md border border-[var(--linear-border-subtle)] bg-[var(--linear-ghost)] px-3 py-2">
-      <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--chat-text-muted)]">
-        {label}
-      </div>
-      <div className="mt-1 text-[13px] font-[510] text-[var(--foreground)]">
-        {value}
-      </div>
-    </div>
-  );
-}
+import { rangesForCodeSpans, SourceCodePanel } from "../SourceCodePanel";
 
 export function AIDetectionDetail({
   onClose,
@@ -35,6 +16,8 @@ export function AIDetectionDetail({
   submission: AIDetectionSubmission;
   student: StudentResultRow | null;
 }) {
+  const ranges = rangesForCodeSpans(submission.spans, student?.sourceText);
+
   return (
     <DetailDrawer onClose={onClose} onCloseStart={onCloseStart}>
       {(close) => (
@@ -54,41 +37,18 @@ export function AIDetectionDetail({
                   Flagged
                 </span>
               ) : null}
+              {ranges.length > 0 ? (
+                <span className="shrink-0 rounded bg-[var(--linear-accent)]/12 px-2 py-0.5 text-[11px] font-[510] text-[var(--linear-accent-hover)]">
+                  {ranges.length} matched {ranges.length === 1 ? "span" : "spans"}
+                </span>
+              ) : null}
             </div>
           </DetailHeader>
-          <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,1fr)_22rem]">
-            <SourceCodePanel
-              className="border-r border-[var(--linear-border-subtle)]"
-              code={student?.sourceText}
-            />
-            <aside className="min-h-0 overflow-y-auto px-4 py-3">
-              <div className="space-y-2">
-                <Stat
-                  label="AI score"
-                  value={
-                    submission.parse_error
-                      ? "Unavailable"
-                      : `${Math.round(submission.best_score * 100)}%`
-                  }
-                />
-                <Stat label="Flagged" value={submission.flagged ? "Yes" : "No"} />
-                <Stat
-                  label="Matches"
-                  value={String(submission.match_count ?? 0)}
-                />
-                {submission.parse_error ? (
-                  <div className="rounded-md border border-[var(--linear-danger)]/25 bg-[var(--linear-danger)]/10 px-3 py-2">
-                    <div className="text-[10px] uppercase tracking-[0.08em] text-[var(--linear-danger)]">
-                      Parse error
-                    </div>
-                    <p className="mt-1 text-[12px] leading-relaxed text-[var(--foreground)]">
-                      {submission.parse_error}
-                    </p>
-                  </div>
-                ) : null}
-              </div>
-            </aside>
-          </div>
+          <SourceCodePanel
+            className="min-h-0 flex-1"
+            code={student?.sourceText}
+            highlightedLineRanges={ranges}
+          />
         </>
       )}
     </DetailDrawer>

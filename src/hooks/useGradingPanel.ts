@@ -32,13 +32,6 @@ function outputRecord(part: UIMessage["parts"][number]) {
   return part.output as Record<string, unknown>;
 }
 
-function inputRecord(part: UIMessage["parts"][number]) {
-  if (!("input" in part) || typeof part.input !== "object" || !part.input) {
-    return undefined;
-  }
-  return part.input as Record<string, unknown>;
-}
-
 function stringOf(value: unknown) {
   return typeof value === "string" && value.trim().length > 0
     ? value.trim()
@@ -76,8 +69,7 @@ function gradingRunFromPart(part: UIMessage["parts"][number]) {
 
 function followupRunIdFromPart(part: UIMessage["parts"][number]) {
   const output = outputRecord(part);
-  const input = inputRecord(part);
-  return stringOf(output?.runId) ?? stringOf(input?.run_id) ?? stringOf(input?.runId);
+  return stringOf(output?.runId);
 }
 
 function followupReportFromPart(
@@ -328,12 +320,12 @@ export function useGradingPanel(messages: UIMessage[]) {
     refreshPanelData,
   ]);
 
-  const fallbackSimilarityReport = useMemo(
+  const storedSimilarityReport = useMemo(
     () => reportFromPanelData(panelData, "similarityReport", "similarity"),
     [panelData],
   );
 
-  const fallbackAiDetectionReport = useMemo(
+  const storedAiDetectionReport = useMemo(
     () => reportFromPanelData(panelData, "aiDetectionReport", "ai-detection"),
     [panelData],
   );
@@ -348,12 +340,12 @@ export function useGradingPanel(messages: UIMessage[]) {
   }, []);
 
   return {
-    aiDetectionReport: aiDetectionReport ?? fallbackAiDetectionReport,
+    aiDetectionReport: aiDetectionReport ?? storedAiDetectionReport,
     hasGradingRun: currentRun !== undefined,
     panelData,
     panelError,
     panelLoading,
     resetPanel,
-    similarityReport: similarityReport ?? fallbackSimilarityReport,
+    similarityReport: similarityReport ?? storedSimilarityReport,
   };
 }

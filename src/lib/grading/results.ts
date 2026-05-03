@@ -1,10 +1,7 @@
 import type { EngineResult, StoredGradingSession } from "@/lib/storage";
 
-/**
- * Canonical shape the UI + tool outputs agree on. The engine returns a loose
- * record; we flatten it here once so no consumer has to re-normalize.
- */
-export type SourceFile = {
+// The engine owns the result shape. This file trims it to the fields the UI renders.
+type SourceFile = {
   content: string;
   path: string;
 };
@@ -48,23 +45,14 @@ export type TestSummary = {
 };
 
 export type StudentRow = {
-  bannedCount: number | null;
+  bannedCount: number;
   bannedHits: BannedHit[];
-  cFiles: string[];
   compileOk: boolean | null;
-  compileTimeMs: number | null;
-  compileTimeout: boolean | null;
   compilerError: string | null;
-  exitCode: number | null;
-  grade: number | null;
-  notes: string | null;
-  path: string | null;
-  sourceFiles: SourceFile[];
   sourceText: string | null;
   status: string | null;
   studentId: string;
   tests: TestSummary | null;
-  testsPassed: string | null;
 };
 
 export type GradingRunSummary = {
@@ -74,17 +62,6 @@ export type GradingRunSummary = {
   similarityReport: unknown | null;
   students: StudentRow[];
 };
-
-const similarityResultKeys = [
-  "similarity",
-  "similarity_report",
-  "similarityReport",
-] as const;
-const aiDetectionResultKeys = [
-  "ai_detection",
-  "aiDetection",
-  "ai_detection_report",
-] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -104,22 +81,6 @@ function bool(value: unknown): boolean | null {
 
 function record(value: unknown): Record<string, unknown> | null {
   return isRecord(value) ? value : null;
-}
-
-function testsPassedOf(value: unknown): string | null {
-  if (!isRecord(value)) {
-    return null;
-  }
-  const passed = num(value.passed);
-  const total = num(value.total);
-  return passed !== null && total !== null ? `${passed}/${total}` : null;
-}
-
-function stringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value.filter((item): item is string => typeof item === "string");
 }
 
 function studentIdOf(raw: Record<string, unknown>): string {
@@ -256,7 +217,6 @@ function sourceTextOf(sourceFiles: SourceFile[]) {
 }
 
 export function toStudentRow(raw: Record<string, unknown>): StudentRow {
-  const submission = record(raw.submission);
   const compile = record(raw.compile);
   const scan = record(raw.scan);
   const sourceFiles = sourceFilesOf(raw.source_files);
@@ -265,21 +225,12 @@ export function toStudentRow(raw: Record<string, unknown>): StudentRow {
   return {
     bannedCount: bannedHits.length,
     bannedHits,
-    cFiles: stringArray(submission?.c_files),
     compileOk: bool(compile?.ok),
-    compileTimeMs: num(compile?.duration_ms),
-    compileTimeout: bool(compile?.timed_out),
     compilerError: str(compile?.stderr),
-    exitCode: num(compile?.exit_code),
-    grade: num(raw.grade),
-    notes: str(raw.notes),
-    path: str(submission?.path),
-    sourceFiles,
     sourceText: sourceTextOf(sourceFiles),
     status: str(raw.status),
     studentId: studentIdOf(raw),
     tests: testsOf(raw.tests),
-    testsPassed: testsPassedOf(raw.tests),
   };
 }
 
@@ -289,22 +240,6 @@ export function studentsFromResult(result: EngineResult | undefined): StudentRow
     return [];
   }
   return rows.filter(isRecord).map(toStudentRow);
-}
-
-function pickResultField(
-  result: EngineResult | undefined,
-  keys: readonly string[],
-) {
-  if (!result) {
-    return null;
-  }
-  for (const key of keys) {
-    const value = result[key];
-    if (value !== undefined && value !== null) {
-      return value;
-    }
-  }
-  return null;
 }
 
 export function gradingRunFromSession(
@@ -321,10 +256,10 @@ export function gradingRunFromSession(
   }
 
   return {
-    aiDetectionReport: pickResultField(session.result, aiDetectionResultKeys),
+    aiDetectionReport: session.result?.ai_detection ?? null,
     assignmentName: session.assignmentName ?? null,
     runId: session.id ?? null,
-    similarityReport: pickResultField(session.result, similarityResultKeys),
+    similarityReport: session.result?.similarity ?? null,
     students: studentsFromResult(session.result),
   };
 }

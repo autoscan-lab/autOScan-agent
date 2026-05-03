@@ -114,7 +114,6 @@ function compactStudent(row: StudentRow) {
   return {
     bannedCount: row.bannedCount,
     compileOk: row.compileOk,
-    grade: row.grade,
     status: row.status,
     studentId: row.studentId,
   };
@@ -149,7 +148,7 @@ export const gradeSubmissions = tool<
     const userId = normalizeUserId(runContext?.context.userId);
     const upload = await r2AttachmentToUpload(attachment, userId);
     const result = await runEngineGrade(assignmentName, upload);
-    const runId = pickStringArg(result, "run_id", "runId");
+    const runId = pickStringArg(result, "run_id");
     if (!runId) {
       return {
         message: "Grading finished but no run_id was returned by the engine.",

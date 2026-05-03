@@ -95,7 +95,7 @@ function compactSummary(output: Record<string, unknown> | undefined) {
 function minimalToolOutput(part: ToolPart, toolName: string) {
   const input = recordOf(part.input);
   const output = recordOf("output" in part ? part.output : undefined);
-  const runId = stringOf(output?.runId) ?? stringOf(input?.run_id);
+  const runId = stringOf(output?.runId);
   const assignmentName =
     stringOf(output?.assignmentName) ?? stringOf(input?.assignment_name);
 

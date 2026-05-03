@@ -178,6 +178,7 @@ export function AgentBar(props: AgentBarProps) {
   const [pillState, setPillState] = useState<PillState>("collapsed");
   const portalRoot = typeof document === "undefined" ? null : document.body;
   const expandedRef = useRef<HTMLDivElement>(null);
+  const expandedScrollRef = useRef<HTMLDivElement>(null);
   const promptProps = {
     attachmentError,
     isModelBusy,
@@ -204,6 +205,15 @@ export function AgentBar(props: AgentBarProps) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [pillState]);
 
+  useEffect(() => {
+    if (pillState !== "expanded") return;
+    const frame = window.requestAnimationFrame(() => {
+      const node = expandedScrollRef.current;
+      if (node) node.scrollTop = node.scrollHeight;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [messages.length, pillState]);
+
   const statusText = isModelBusy
     ? "Thinking..."
     : panelData
@@ -215,11 +225,23 @@ export function AgentBar(props: AgentBarProps) {
     "shrink-0 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
     isResultsLayout
       ? "pb-5 pt-2"
-      : layoutState === "empty"
-        ? "basis-[54%] pb-5 pt-2"
-        : "h-[500px] pb-5 pt-2",
+      : "basis-[54%] pb-5 pt-2",
   );
   const placeholderHeightClassName = isResultsLayout ? "h-12" : "h-full";
+  const shellSize = isResultsLayout
+    ? isExpanded
+      ? {
+        height: "360px",
+        width: "min(42rem, calc(100vw - 2rem))",
+      }
+      : {
+        height: "48px",
+        width: "360px",
+      }
+    : {
+      height: "calc(54vh - 1.75rem)",
+      width: "min(58rem, calc(100vw - 2rem))",
+    };
 
   return (
     <>
@@ -230,17 +252,11 @@ export function AgentBar(props: AgentBarProps) {
       {portalRoot && createPortal(
         <div
           className={cn(
-            "fixed bottom-5 left-1/2 z-[60] px-4 will-change-transform",
+            "fixed bottom-5 left-1/2 z-[60] will-change-transform",
             "transition-[width,height,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
-            isResultsLayout
-              ? isExpanded
-                ? "h-[360px] w-[min(44rem,100vw)]"
-                : "h-12 w-full max-w-[392px]"
-              : layoutState === "empty"
-                ? "h-[calc(54vh-1.75rem)] w-full max-w-[58rem]"
-                : "h-[min(500px,calc(100vh-2rem))] w-full max-w-[58rem]",
           )}
           style={{
+            ...shellSize,
             transform: isResultsLayout && detailOpen
               ? "translateX(calc(50vw - 1rem - 100%))"
               : "translateX(-50%)",
@@ -293,7 +309,10 @@ export function AgentBar(props: AgentBarProps) {
               </div>
             ) : isExpanded ? (
               <div className="grid h-full grid-rows-[minmax(0,1fr)_auto]">
-                <div className="no-scrollbar min-h-0 overflow-y-auto overscroll-contain px-4 pb-2 pt-3">
+                <div
+                  className="no-scrollbar min-h-0 overflow-y-auto overscroll-contain px-4 pb-2 pt-3"
+                  ref={expandedScrollRef}
+                >
                   <MessageHistory
                     isModelBusy={isModelBusy}
                     messages={messages.slice(-4)}

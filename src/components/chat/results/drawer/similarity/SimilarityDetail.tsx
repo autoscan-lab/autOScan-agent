@@ -3,7 +3,7 @@ import type { StudentResultRow } from "@/components/chat/shared/types";
 import type { SimilarityPair } from "@/components/chat/shared/tool-reports";
 import { DetailDrawer } from "../DetailDrawer";
 import { DetailHeader } from "../DetailHeader";
-import { SourceCodePanel } from "../SourceCodePanel";
+import { rangesForCodeSpans, SourceCodePanel } from "../SourceCodePanel";
 
 function sourceFor(studentId: string, students: StudentResultRow[]) {
   return students.find((student) => student.studentId === studentId) ?? null;
@@ -11,24 +11,30 @@ function sourceFor(studentId: string, students: StudentResultRow[]) {
 
 function SourceComparePanel({
   label,
+  ranges,
   student,
 }: {
   label: string;
+  ranges: ReturnType<typeof rangesForCodeSpans>;
   student: StudentResultRow | null;
 }) {
   return (
     <section className="flex min-h-0 flex-col border-r border-[var(--linear-border-subtle)] last:border-r-0">
-      <div className="flex h-9 shrink-0 items-center justify-between gap-3 border-b border-[var(--linear-border-subtle)] px-3">
+      <div className="flex h-9 shrink-0 items-center gap-3 border-b border-[var(--linear-border-subtle)] px-3">
         <span className="truncate text-[12px] font-[510] text-[var(--foreground)]">
           {label}
         </span>
-        {student?.path ? (
-          <span className="truncate font-mono text-[10.5px] text-[var(--chat-text-muted)]">
-            {student.path}
+        {ranges.length > 0 ? (
+          <span className="shrink-0 rounded bg-[var(--linear-accent)]/12 px-2 py-0.5 text-[11px] font-[510] text-[var(--linear-accent-hover)]">
+            {ranges.length} matched {ranges.length === 1 ? "span" : "spans"}
           </span>
         ) : null}
       </div>
-      <SourceCodePanel className="flex-1" code={student?.sourceText} />
+      <SourceCodePanel
+        className="flex-1"
+        code={student?.sourceText}
+        highlightedLineRanges={ranges}
+      />
     </section>
   );
 }
@@ -46,6 +52,8 @@ export function SimilarityDetail({
 }) {
   const studentA = sourceFor(pair.a, students);
   const studentB = sourceFor(pair.b, students);
+  const rangesA = rangesForCodeSpans(pair.spansA, studentA?.sourceText);
+  const rangesB = rangesForCodeSpans(pair.spansB, studentB?.sourceText);
 
   return (
     <DetailDrawer onClose={onClose} onCloseStart={onCloseStart}>
@@ -69,10 +77,12 @@ export function SimilarityDetail({
           <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-2">
             <SourceComparePanel
               label={formatStudentName(pair.a)}
+              ranges={rangesA}
               student={studentA}
             />
             <SourceComparePanel
               label={formatStudentName(pair.b)}
+              ranges={rangesB}
               student={studentB}
             />
           </div>
