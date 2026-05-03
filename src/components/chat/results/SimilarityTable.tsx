@@ -53,12 +53,6 @@ function studentLabel(value: string) {
   return parts.at(-1) ?? value;
 }
 
-function scoreTone(flagged: boolean, score: number) {
-  if (flagged) return "text-[var(--linear-danger)]";
-  if (score >= 0.5) return "text-orange-300";
-  return "text-[var(--chat-text-muted)]";
-}
-
 export function SimilarityTable({ report }: { report: ToolReport | null }) {
   if (!report) return <EmptyReport>No report has been returned yet.</EmptyReport>;
 
@@ -78,7 +72,7 @@ export function SimilarityTable({ report }: { report: ToolReport | null }) {
           key: "studentA",
           label: "Student A",
           render: (row) => (
-            <span className="block truncate font-[510] text-[var(--foreground)]">
+            <span className="block truncate">
               {studentLabel(row.a)}
             </span>
           ),
@@ -87,7 +81,7 @@ export function SimilarityTable({ report }: { report: ToolReport | null }) {
           key: "studentB",
           label: "Student B",
           render: (row) => (
-            <span className="block truncate font-[510] text-[var(--foreground)]">
+            <span className="block truncate">
               {studentLabel(row.b)}
             </span>
           ),
@@ -95,26 +89,12 @@ export function SimilarityTable({ report }: { report: ToolReport | null }) {
         {
           key: "similarity",
           label: "Similarity",
-          render: (row) => (
-            <span className={scoreTone(row.flagged, row.similarity_percent / 100)}>
-              {similarityPercent(row.similarity_percent)}
-            </span>
-          ),
+          render: (row) => <span>{similarityPercent(row.similarity_percent)}</span>,
         },
         {
           key: "flagged",
           label: "Flagged",
-          render: (row) => (
-            <span
-              className={
-                row.flagged
-                  ? "text-[var(--linear-danger)]"
-                  : "text-[var(--chat-text-muted)]"
-              }
-            >
-              {row.flagged ? "Yes" : "No"}
-            </span>
-          ),
+          render: (row) => <span>{row.flagged ? "Yes" : "No"}</span>,
         },
       ]}
       rows={similarity.pairs.map((pair) => ({

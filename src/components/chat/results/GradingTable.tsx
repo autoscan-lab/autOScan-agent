@@ -13,17 +13,10 @@ function testsLabel(student: StudentResultRow) {
     : "—";
 }
 
-function testsColor(student: StudentResultRow) {
-  if (!student.tests) return "text-[var(--chat-text-muted)]";
-  return (student.tests.failed ?? 0) > 0
-    ? "text-[var(--linear-danger)]"
-    : "text-[var(--linear-success)]";
-}
-
 function CompilesStatus({ student }: { student: StudentResultRow }) {
   if (student.compileOk === true) {
     return (
-      <span aria-label="Compiles" className="text-[var(--linear-success)]" title="Compiles">
+      <span aria-label="Compiles" title="Compiles">
         <CheckIcon className="size-4" strokeWidth={2.2} />
       </span>
     );
@@ -31,13 +24,13 @@ function CompilesStatus({ student }: { student: StudentResultRow }) {
 
   if (student.compileOk === false) {
     return (
-      <span aria-label="Does not compile" className="text-[var(--linear-danger)]" title="Does not compile">
+      <span aria-label="Does not compile" title="Does not compile">
         <XIcon className="size-4" strokeWidth={2.2} />
       </span>
     );
   }
 
-  return <span className="text-[var(--chat-text-muted)]">—</span>;
+  return <span>—</span>;
 }
 
 export function GradingTable({
@@ -56,7 +49,7 @@ export function GradingTable({
           key: "student",
           label: "Student",
           render: (student) => (
-            <span className="block truncate font-[510] text-[var(--foreground)]">
+            <span className="block truncate">
               {formatStudentName(student.studentId)}
             </span>
           ),
@@ -69,25 +62,17 @@ export function GradingTable({
         {
           key: "tests",
           label: "Tests",
-          render: (student) => (
-            <span className={testsColor(student)}>{testsLabel(student)}</span>
-          ),
+          render: (student) => <span>{testsLabel(student)}</span>,
         },
         {
           key: "grade",
           label: "Grade",
-          render: (student) => (
-            <span className="text-[var(--foreground)]">
-              {student.grade ?? "—"}
-            </span>
-          ),
+          render: (student) => <span>{student.grade ?? "—"}</span>,
         },
         {
           key: "feedback",
           label: "Feedback",
-          render: () => (
-            <span className="text-[var(--chat-text-muted)]">—</span>
-          ),
+          render: () => <span>—</span>,
         },
       ]}
       onRowSelect={(student) => setSelectedStudentId(student.studentId)}
