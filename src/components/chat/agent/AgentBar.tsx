@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { FileUIPart, UIMessage } from "ai";
 
@@ -157,6 +157,25 @@ function CollapsedPillButton({
   );
 }
 
+function messageScrollKey(messages: UIMessage[]) {
+  return messages
+    .map((message) =>
+      message.parts
+        .map((part) => {
+          if (part.type === "text") return `text:${part.text.length}`;
+          if ("state" in part) return `${part.type}:${part.state}`;
+          if (part.type === "file") return `file:${part.url}`;
+          return part.type;
+        })
+        .join(","),
+    )
+    .join("|");
+}
+
+function isNearBottom(node: HTMLElement) {
+  return node.scrollHeight - node.scrollTop - node.clientHeight < 48;
+}
+
 export function AgentBar(props: AgentBarProps) {
   const {
     attachmentError,
@@ -179,6 +198,8 @@ export function AgentBar(props: AgentBarProps) {
   const portalRoot = typeof document === "undefined" ? null : document.body;
   const expandedRef = useRef<HTMLDivElement>(null);
   const expandedScrollRef = useRef<HTMLDivElement>(null);
+  const expandedStickToBottom = useRef(true);
+  const scrollKey = useMemo(() => messageScrollKey(messages), [messages]);
   const promptProps = {
     attachmentError,
     isModelBusy,
@@ -207,12 +228,22 @@ export function AgentBar(props: AgentBarProps) {
 
   useEffect(() => {
     if (pillState !== "expanded") return;
+    expandedStickToBottom.current = true;
     const frame = window.requestAnimationFrame(() => {
       const node = expandedScrollRef.current;
       if (node) node.scrollTop = node.scrollHeight;
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [messages.length, pillState]);
+  }, [pillState]);
+
+  useEffect(() => {
+    if (pillState !== "expanded" || !expandedStickToBottom.current) return;
+    const frame = window.requestAnimationFrame(() => {
+      const node = expandedScrollRef.current;
+      if (node) node.scrollTop = node.scrollHeight;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [pillState, scrollKey]);
 
   const statusText = isModelBusy
     ? "Thinking..."
@@ -311,6 +342,9 @@ export function AgentBar(props: AgentBarProps) {
               <div className="grid h-full grid-rows-[minmax(0,1fr)_auto]">
                 <div
                   className="no-scrollbar min-h-0 overflow-y-auto overscroll-contain px-4 pb-2 pt-3"
+                  onScroll={(event) => {
+                    expandedStickToBottom.current = isNearBottom(event.currentTarget);
+                  }}
                   ref={expandedScrollRef}
                 >
                   <MessageHistory

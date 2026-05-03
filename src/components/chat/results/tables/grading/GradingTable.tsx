@@ -5,7 +5,7 @@ import { formatStudentName } from "@/components/chat/shared/display";
 import { ResultsTable } from "../ResultsTable";
 
 const gradingTemplate =
-  "minmax(10rem,1.6fr) minmax(7rem,0.8fr) minmax(6rem,0.7fr) minmax(6rem,0.7fr) minmax(7rem,0.7fr)";
+  "minmax(10rem,1.7fr) minmax(6rem,0.8fr) minmax(6rem,0.8fr) minmax(7rem,0.7fr)";
 
 function testsLabel(student: StudentResultRow) {
   return student.tests
@@ -33,20 +33,6 @@ function CompilesStatus({ student }: { student: StudentResultRow }) {
   return <span>—</span>;
 }
 
-function statusLabel(status: string | null) {
-  return status ?? "unknown";
-}
-
-function statusClassName(status: string | null) {
-  if (status === "clean") {
-    return "text-[var(--linear-success)]";
-  }
-  if (status === "banned" || status === "failed") {
-    return "text-[var(--linear-danger)]";
-  }
-  return "text-[var(--chat-text-muted)]";
-}
-
 export function GradingTable({
   selectedStudentId,
   setSelectedStudentId,
@@ -65,15 +51,6 @@ export function GradingTable({
           render: (student) => (
             <span className="block truncate">
               {formatStudentName(student.studentId)}
-            </span>
-          ),
-        },
-        {
-          key: "status",
-          label: "Status",
-          render: (student) => (
-            <span className={statusClassName(student.status)}>
-              {statusLabel(student.status)}
             </span>
           ),
         },

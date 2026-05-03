@@ -19,8 +19,8 @@ export type LayoutState = "empty" | "active" | "results";
 type ResultsTab = "grading" | "similarity" | "aiDetection";
 
 const columnTemplate =
-  "minmax(10rem,1.6fr) minmax(7rem,0.8fr) minmax(6rem,0.7fr) minmax(6rem,0.7fr) minmax(7rem,0.7fr)";
-const columnHeaders = ["Student", "Status", "Compile", "Tests", "Banned"];
+  "minmax(10rem,1.7fr) minmax(6rem,0.8fr) minmax(6rem,0.8fr) minmax(7rem,0.7fr)";
+const columnHeaders = ["Student", "Compile", "Tests", "Banned"];
 const resultTabs: Array<{ id: ResultsTab; label: string }> = [
   { id: "grading", label: "Grading" },
   { id: "similarity", label: "Similarity" },
@@ -33,7 +33,7 @@ function GhostRow() {
       className="grid border-b border-[var(--linear-border-subtle)] last:border-b-0"
       style={{ gridTemplateColumns: columnTemplate }}
     >
-      {[60, 30, 30, 25, 48].map((width, i) => (
+      {[60, 30, 30, 25].map((width, i) => (
         <div className="px-4 py-3" key={i}>
           <div
             className="h-2.5 animate-pulse rounded bg-white/[0.04]"

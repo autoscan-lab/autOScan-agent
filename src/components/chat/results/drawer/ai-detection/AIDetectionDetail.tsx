@@ -37,11 +37,6 @@ export function AIDetectionDetail({
                   Flagged
                 </span>
               ) : null}
-              {ranges.length > 0 ? (
-                <span className="shrink-0 rounded bg-[var(--linear-accent)]/12 px-2 py-0.5 text-[11px] font-[510] text-[var(--linear-accent-hover)]">
-                  {ranges.length} matched {ranges.length === 1 ? "span" : "spans"}
-                </span>
-              ) : null}
             </div>
           </DetailHeader>
           <SourceCodePanel
