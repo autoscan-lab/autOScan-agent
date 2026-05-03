@@ -1,4 +1,5 @@
 import type { ToolReport } from "@/components/chat/shared/types";
+import { formatStudentName } from "@/components/chat/shared/display";
 import { EmptyReport, ResultsTable } from "../ResultsTable";
 
 type AIDetectionSubmission = {
@@ -56,16 +57,15 @@ function reportOf(payload: unknown): AIDetectionReport | null {
   };
 }
 
-function percent(value: number) {
-  return `${Math.round(value * 100)}%`;
-}
-
-function studentLabel(value: string) {
-  const parts = value.split("/").filter(Boolean);
-  return parts.at(-1) ?? value;
-}
-
-export function AIDetectionTable({ report }: { report: ToolReport | null }) {
+export function AIDetectionTable({
+  onRowSelect,
+  report,
+  selectedId,
+}: {
+  onRowSelect?: (row: AIDetectionSubmission) => void;
+  report: ToolReport | null;
+  selectedId?: string | null;
+}) {
   if (!report) return <EmptyReport>No report has been returned yet.</EmptyReport>;
 
   const detection = reportOf(report.payload);
@@ -84,15 +84,15 @@ export function AIDetectionTable({ report }: { report: ToolReport | null }) {
           key: "student",
           label: "Student",
           render: (row) => (
-            <span className="block truncate">
-              {studentLabel(row.id)}
-            </span>
+            <span className="block truncate">{formatStudentName(row.id)}</span>
           ),
         },
         {
           key: "score",
           label: "AI Score",
-          render: (row) => <span>{row.parse_error ? "Error" : percent(row.best_score)}</span>,
+          render: (row) => (
+            <span>{row.parse_error ? "Error" : `${Math.round(row.best_score * 100)}%`}</span>
+          ),
         },
         {
           key: "flagged",
@@ -100,7 +100,9 @@ export function AIDetectionTable({ report }: { report: ToolReport | null }) {
           render: (row) => <span>{row.flagged ? "Yes" : "No"}</span>,
         },
       ]}
+      onRowSelect={onRowSelect}
       rows={detection.submissions}
+      selectedId={selectedId}
       template={aiDetectionTemplate}
     />
   );

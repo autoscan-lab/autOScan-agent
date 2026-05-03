@@ -1,4 +1,5 @@
 import type { ToolReport } from "@/components/chat/shared/types";
+import { formatStudentName } from "@/components/chat/shared/display";
 import { EmptyReport, ResultsTable } from "../ResultsTable";
 
 type SimilarityPair = {
@@ -44,16 +45,15 @@ function reportOf(payload: unknown): SimilarityReport | null {
   return { pairs: payload.pairs, source_file: payload.source_file };
 }
 
-function similarityPercent(value: number) {
-  return `${Math.round(value)}%`;
-}
-
-function studentLabel(value: string) {
-  const parts = value.split("/").filter(Boolean);
-  return parts.at(-1) ?? value;
-}
-
-export function SimilarityTable({ report }: { report: ToolReport | null }) {
+export function SimilarityTable({
+  onRowSelect,
+  report,
+  selectedId,
+}: {
+  onRowSelect?: (row: SimilarityPair & { id: string }) => void;
+  report: ToolReport | null;
+  selectedId?: string | null;
+}) {
   if (!report) return <EmptyReport>No report has been returned yet.</EmptyReport>;
 
   const similarity = reportOf(report.payload);
@@ -72,24 +72,20 @@ export function SimilarityTable({ report }: { report: ToolReport | null }) {
           key: "studentA",
           label: "Student A",
           render: (row) => (
-            <span className="block truncate">
-              {studentLabel(row.a)}
-            </span>
+            <span className="block truncate">{formatStudentName(row.a)}</span>
           ),
         },
         {
           key: "studentB",
           label: "Student B",
           render: (row) => (
-            <span className="block truncate">
-              {studentLabel(row.b)}
-            </span>
+            <span className="block truncate">{formatStudentName(row.b)}</span>
           ),
         },
         {
           key: "similarity",
           label: "Similarity",
-          render: (row) => <span>{similarityPercent(row.similarity_percent)}</span>,
+          render: (row) => <span>{Math.round(row.similarity_percent)}%</span>,
         },
         {
           key: "flagged",
@@ -97,10 +93,9 @@ export function SimilarityTable({ report }: { report: ToolReport | null }) {
           render: (row) => <span>{row.flagged ? "Yes" : "No"}</span>,
         },
       ]}
-      rows={similarity.pairs.map((pair) => ({
-        ...pair,
-        id: `${pair.a}-${pair.b}`,
-      }))}
+      onRowSelect={onRowSelect}
+      rows={similarity.pairs.map((pair) => ({ ...pair, id: `${pair.a}-${pair.b}` }))}
+      selectedId={selectedId}
       template={similarityTemplate}
     />
   );
