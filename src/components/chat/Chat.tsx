@@ -9,6 +9,7 @@ import { AccountMenu } from "@/components/chat/account/AccountMenu";
 import { AgentBar } from "@/components/chat/agent/AgentBar";
 import { ResultsPane } from "@/components/chat/results/ResultsPane";
 import type { LayoutState } from "@/components/chat/results/ResultsPane";
+import { StudentDetail } from "@/components/chat/results/drawer/student/StudentDetail";
 import { useGradingPanel } from "@/hooks/useGradingPanel";
 import { usePersistentChat } from "@/hooks/usePersistentChat";
 import type {
@@ -75,6 +76,22 @@ export function Chat({
     : isModelBusy
       ? "active"
       : "empty";
+  const students = useMemo(() => panelData?.students ?? [], [panelData?.students]);
+  const selectedStudent = useMemo(
+    () => students.find((student) => student.studentId === selectedStudentId) ?? null,
+    [selectedStudentId, students],
+  );
+
+  // Separate from selectedStudent so the pill can start its return animation
+  // at the same moment the curtain starts closing, not after it finishes.
+  const [detailOpenForPill, setDetailOpenForPill] = useState(false);
+  const handleDetailOpen = useCallback((id: string | null) => {
+    if (id !== null) setDetailOpenForPill(true);
+    setSelectedStudentId(id);
+  }, [setSelectedStudentId]);
+  const handleDetailCloseStart = useCallback(() => {
+    setDetailOpenForPill(false);
+  }, []);
 
   const uploadAttachment = useCallback(
     async (file: File): Promise<FileUIPart> => {
@@ -214,11 +231,12 @@ export function Chat({
           panelError={panelError}
           panelLoading={panelLoading}
           selectedStudentId={selectedStudentId}
-          setSelectedStudentId={setSelectedStudentId}
+          setSelectedStudentId={handleDetailOpen}
           similarityReport={similarityReport}
         />
         <AgentBar
           attachmentError={attachmentError}
+          detailOpen={detailOpenForPill}
           error={error}
           isModelBusy={isModelBusy}
           layoutState={layoutState}
@@ -232,6 +250,15 @@ export function Chat({
           runtimeError={runtimeError}
           userName={userName}
         />
+        {selectedStudent ? (
+          <StudentDetail
+            onClose={() => setSelectedStudentId(null)}
+            onCloseStart={handleDetailCloseStart}
+            onNavigate={handleDetailOpen}
+            student={selectedStudent}
+            students={students}
+          />
+        ) : null}
       </main>
     </div>
   );

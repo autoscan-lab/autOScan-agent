@@ -2,7 +2,7 @@ import { CheckIcon, XIcon } from "lucide-react";
 
 import type { StudentResultRow } from "@/components/chat/shared/types";
 import { formatStudentName } from "@/components/chat/shared/display";
-import { ResultsTable } from "./ResultsTable";
+import { ResultsTable } from "../ResultsTable";
 
 const gradingTemplate =
   "minmax(10rem,1.7fr) minmax(6rem,0.8fr) minmax(6rem,0.8fr) minmax(6rem,0.8fr) minmax(10rem,1.4fr)";

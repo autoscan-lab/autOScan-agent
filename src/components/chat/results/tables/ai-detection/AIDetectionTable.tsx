@@ -1,5 +1,5 @@
 import type { ToolReport } from "@/components/chat/shared/types";
-import { EmptyReport, ResultsTable } from "./ResultsTable";
+import { EmptyReport, ResultsTable } from "../ResultsTable";
 
 type AIDetectionSubmission = {
   best_score: number;

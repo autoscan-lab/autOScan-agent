@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { FileUIPart, UIMessage } from "ai";
 
 import { cn } from "@/lib/utils";
@@ -8,7 +9,6 @@ import type {
   GradingRunResponse,
   ZipPromptMessage,
 } from "@/components/chat/shared/types";
-import { maxZipBytes, zipAccept } from "@/components/chat/shared/constants";
 import { ChatMessages } from "@/components/chat/conversation/ChatMessages";
 import { ZipPromptInput } from "@/components/chat/agent/ZipPromptInput";
 import {
@@ -22,6 +22,7 @@ type PillState = "collapsed" | "hover" | "expanded";
 
 type AgentBarProps = {
   attachmentError: string | null;
+  detailOpen: boolean;
   error: Error | undefined;
   isModelBusy: boolean;
   layoutState: LayoutState;
@@ -68,9 +69,9 @@ function PromptComposer({
         </p>
       ) : null}
       <ZipPromptInput
-        accept={zipAccept}
+        accept=".zip,application/zip,application/x-zip-compressed"
         busy={isModelBusy}
-        maxFileSize={maxZipBytes}
+        maxFileSize={12 * 1024 * 1024}
         onError={onError}
         onStop={onStop}
         onSubmit={onSubmit}
@@ -123,6 +124,7 @@ function MessageHistory({
 export function AgentBar(props: AgentBarProps) {
   const {
     attachmentError,
+    detailOpen,
     error,
     isModelBusy,
     layoutState,
@@ -138,6 +140,7 @@ export function AgentBar(props: AgentBarProps) {
   } = props;
 
   const [pillState, setPillState] = useState<PillState>("collapsed");
+  const [portalMounted, setPortalMounted] = useState(false);
   const expandedRef = useRef<HTMLDivElement>(null);
   const promptProps = {
     attachmentError,
@@ -147,6 +150,12 @@ export function AgentBar(props: AgentBarProps) {
     onSubmit,
     onUploadFile,
   };
+
+  useEffect(() => { setPortalMounted(true); }, []);
+
+  // Collapse pill whenever the detail state toggles so the position
+  // transition always starts from the 360px collapsed width.
+  useEffect(() => { setPillState("collapsed"); }, [detailOpen]);
 
   useEffect(() => {
     if (pillState !== "expanded") return;
@@ -204,65 +213,96 @@ export function AgentBar(props: AgentBarProps) {
   const isExpanded = pillState === "expanded";
   const expandedWidth = "w-[min(42rem,calc(100vw-2rem))]";
 
+  // The pill is always portaled to document.body to escape <main>'s z-10 stacking
+  // context, ensuring it sits above the DetailDrawer curtain (z-50) at z-60.
+  //
+  // Position is driven entirely by translateX on a left:50% anchor:
+  //   centered  → translateX(-50%)              pill center at 50vw
+  //   bottom-right → translateX(calc(50vw-376px)) right edge 16px from viewport right
+  //
+  // CSS transitions between these two values because both resolve to px offsets,
+  // giving the slide animation when the detail drawer opens/closes.
   return (
-    <div className="flex shrink-0 justify-center px-4 pb-5 pt-2">
-      <div
-        ref={expandedRef}
-        className={cn(
-          "origin-center overflow-hidden transition-[width,height,border-radius,scale,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform",
-          "bg-[var(--linear-panel)]",
-          cardShadow,
-          isExpanded ? cn("h-[360px] rounded-2xl", expandedWidth) : "w-[360px] rounded-[28px]",
-          pillState === "collapsed"
-            ? "h-12 duration-300"
-            : pillState === "hover"
-              ? "h-12 scale-[1.08] duration-[480ms]"
-              : "h-[360px]",
-        )}
-        onMouseEnter={() => {
-          if (pillState === "collapsed") setPillState("hover");
-        }}
-        onMouseLeave={() => {
-          if (pillState === "hover") setPillState("collapsed");
-        }}
-      >
-        {isExpanded ? (
-          <div className="grid h-full grid-rows-[minmax(0,1fr)_auto]">
-            <div className="no-scrollbar min-h-0 overflow-y-auto overscroll-contain px-4 pb-2 pt-3">
-              <MessageHistory
-                isModelBusy={isModelBusy}
-                messages={messages.slice(-4)}
-                onElapsedSettled={onElapsedSettled}
-                userName={userName}
-              />
-            </div>
-            <PromptComposer className="shrink-0 px-3 pb-3" {...promptProps} />
-          </div>
-        ) : (
-          <button
-            className="flex h-full w-full items-center gap-3 px-5 text-left"
-            onClick={() => setPillState("expanded")}
-            type="button"
-          >
-            <span
-              className={cn(
-                "size-2 shrink-0 rounded-full transition-colors",
-                isModelBusy
-                  ? "animate-pulse bg-[var(--linear-accent)]"
-                  : "bg-[var(--linear-success)]",
-              )}
-            />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-[510] text-[var(--foreground)]">
-                {statusText}
-              </span>
-            </span>
-            <span className="shrink-0 text-[11px] text-[var(--chat-text-muted)]">
-              Ask
-            </span>
-          </button>
-        )}
+    <>
+      {/* Flow placeholder keeps ResultsPane from filling the full height */}
+      <div aria-hidden className="shrink-0 pb-5 pt-2">
+        <div className="h-12" />
       </div>
-    </div>
+
+      {portalMounted && createPortal(
+        <div
+          className={cn(
+            "fixed bottom-5 z-[60] will-change-transform",
+            "transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+          )}
+          style={{
+            left: "50%",
+            transform: detailOpen
+              ? "translateX(calc(50vw - 1rem - 100%))"
+              : "translateX(-50%)",
+          }}
+        >
+          <div
+            ref={expandedRef}
+            className={cn(
+              "overflow-hidden transition-[width,height,border-radius,scale,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform",
+              "bg-[var(--linear-panel)]",
+              cardShadow,
+              detailOpen ? "origin-bottom-right" : "origin-center",
+              isExpanded ? cn("h-[360px] rounded-2xl", expandedWidth) : "w-[360px] rounded-[28px]",
+              pillState === "collapsed"
+                ? "h-12 duration-300"
+                : pillState === "hover"
+                  ? "h-12 scale-[1.08] duration-[480ms]"
+                  : "h-[360px]",
+            )}
+            onMouseEnter={() => {
+              if (pillState === "collapsed") setPillState("hover");
+            }}
+            onMouseLeave={() => {
+              if (pillState === "hover") setPillState("collapsed");
+            }}
+          >
+            {isExpanded ? (
+              <div className="grid h-full grid-rows-[minmax(0,1fr)_auto]">
+                <div className="no-scrollbar min-h-0 overflow-y-auto overscroll-contain px-4 pb-2 pt-3">
+                  <MessageHistory
+                    isModelBusy={isModelBusy}
+                    messages={messages.slice(-4)}
+                    onElapsedSettled={onElapsedSettled}
+                    userName={userName}
+                  />
+                </div>
+                <PromptComposer className="shrink-0 px-3 pb-3" {...promptProps} />
+              </div>
+            ) : (
+              <button
+                className="flex h-full w-full items-center gap-3 px-5 text-left"
+                onClick={() => setPillState("expanded")}
+                type="button"
+              >
+                <span
+                  className={cn(
+                    "size-2 shrink-0 rounded-full transition-colors",
+                    isModelBusy
+                      ? "animate-pulse bg-[var(--linear-accent)]"
+                      : "bg-[var(--linear-success)]",
+                  )}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-[510] text-[var(--foreground)]">
+                    {statusText}
+                  </span>
+                </span>
+                <span className="shrink-0 text-[11px] text-[var(--chat-text-muted)]">
+                  Ask
+                </span>
+              </button>
+            )}
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
   );
 }

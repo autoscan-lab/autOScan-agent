@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
@@ -9,10 +9,9 @@ import type {
   StudentResultRow,
   ToolReport,
 } from "@/components/chat/shared/types";
-import { AIDetectionTable } from "@/components/chat/results/AIDetectionTable";
-import { GradingTable } from "@/components/chat/results/GradingTable";
-import { SimilarityTable } from "@/components/chat/results/SimilarityTable";
-import { StudentDetail } from "./student-detail/StudentDetail";
+import { AIDetectionTable } from "@/components/chat/results/tables/ai-detection/AIDetectionTable";
+import { GradingTable } from "@/components/chat/results/tables/grading/GradingTable";
+import { SimilarityTable } from "@/components/chat/results/tables/similarity/SimilarityTable";
 
 export type LayoutState = "empty" | "active" | "results";
 
@@ -135,28 +134,6 @@ export function ResultsPane({
 
   const [tab, setTab] = useState<ResultsTab>("grading");
 
-  // Auto-switch to a newly arrived report
-  const prevSimRef = useRef<string | null>(null);
-  const prevAiRef = useRef<string | null>(null);
-  useEffect(() => {
-    const simId = similarityReport?.toolCallId ?? null;
-    const aiId = aiDetectionReport?.toolCallId ?? null;
-
-    if (aiId && aiId !== prevAiRef.current) {
-      setTab("aiDetection");
-    } else if (simId && simId !== prevSimRef.current) {
-      setTab("similarity");
-    }
-
-    prevSimRef.current = simId;
-    prevAiRef.current = aiId;
-  }, [aiDetectionReport?.toolCallId, similarityReport?.toolCallId]);
-
-  const selectedStudent = useMemo(
-    () => students.find((s) => s.studentId === selectedStudentId) ?? null,
-    [students, selectedStudentId],
-  );
-
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden">
       <div className="no-scrollbar h-full overflow-y-auto">
@@ -211,15 +188,6 @@ export function ResultsPane({
         )}
       </div>
 
-      {/* Student detail slide-over */}
-      {selectedStudent ? (
-        <StudentDetail
-          onClose={() => setSelectedStudentId(null)}
-          onNavigate={setSelectedStudentId}
-          student={selectedStudent}
-          students={students}
-        />
-      ) : null}
     </div>
   );
 }
