@@ -3,17 +3,17 @@
 import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { useState } from "react";
 
-import type { StudentInspectorRow } from "@/components/chat/support/types";
+import type { StudentResultRow } from "@/components/chat/shared/types";
 import { cn } from "@/lib/utils";
 
 type DrawerTab = "compile" | "banned";
 type ReviewState = "compile" | "banned" | "clean";
 
-function normalizedStatus(student: StudentInspectorRow) {
+function normalizedStatus(student: StudentResultRow) {
   return student.status?.toLowerCase().trim() ?? "";
 }
 
-function isCompileIssue(student: StudentInspectorRow) {
+function isCompileIssue(student: StudentResultRow) {
   const status = normalizedStatus(student);
   return (
     student.compileOk === false ||
@@ -24,7 +24,7 @@ function isCompileIssue(student: StudentInspectorRow) {
   );
 }
 
-function reviewState(student: StudentInspectorRow): ReviewState {
+function reviewState(student: StudentResultRow): ReviewState {
   if (isCompileIssue(student)) {
     return "compile";
   }
@@ -34,11 +34,11 @@ function reviewState(student: StudentInspectorRow): ReviewState {
   return "clean";
 }
 
-function initialDrawerTab(student: StudentInspectorRow): DrawerTab {
+function initialDrawerTab(student: StudentResultRow): DrawerTab {
   return reviewState(student) === "banned" ? "banned" : "compile";
 }
 
-function tabTone(tab: DrawerTab, active: boolean, student: StudentInspectorRow) {
+function tabTone(tab: DrawerTab, active: boolean, student: StudentResultRow) {
   const hasCompileIssue = isCompileIssue(student);
   const hasBannedHits = student.bannedHits.length > 0;
   if (tab === "compile" && hasCompileIssue) {
@@ -56,14 +56,14 @@ function tabTone(tab: DrawerTab, active: boolean, student: StudentInspectorRow) 
     : "border-[var(--linear-border-subtle)] bg-white/[0.02] text-[var(--chat-text-muted)] hover:border-[var(--linear-border)] hover:bg-white/[0.05] hover:text-[var(--foreground)]";
 }
 
-function locationLabel(hit: StudentInspectorRow["bannedHits"][number]) {
+function locationLabel(hit: StudentResultRow["bannedHits"][number]) {
   const file = hit.file ?? "unknown file";
   const line = hit.line === null ? "" : `:${hit.line}`;
   const column = hit.column === null ? "" : `:${hit.column}`;
   return `${file}${line}${column}`;
 }
 
-function CompileTab({ student }: { student: StudentInspectorRow }) {
+function CompileTab({ student }: { student: StudentResultRow }) {
   if (!student.compilerError) {
     return (
       <p className="text-[12px] leading-relaxed text-[var(--chat-text-secondary)]">
@@ -84,7 +84,7 @@ function BannedTab({
   student,
 }: {
   onRevealLine: (line: number) => void;
-  student: StudentInspectorRow;
+  student: StudentResultRow;
 }) {
   if (student.bannedHits.length === 0) {
     return (
@@ -131,7 +131,7 @@ export function StatusDrawer({
   student,
 }: {
   onRevealLine: (line: number) => void;
-  student: StudentInspectorRow;
+  student: StudentResultRow;
 }) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<DrawerTab>(() =>

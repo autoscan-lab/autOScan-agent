@@ -5,16 +5,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   GradingRunResponse,
-  InspectorView,
   ToolReport,
-} from "@/components/chat/support/types";
+} from "@/components/chat/shared/types";
 
 type GradingRun = {
   runId: string;
   toolCallId: string;
 };
 
-type LatestInspectorEvent =
+type LatestResultEvent =
   | { kind: "grading"; runId: string | null; toolCallId: string }
   | { kind: "similarity"; runId: string | null; toolCallId: string }
   | { kind: "aiDetection"; runId: string | null; toolCallId: string };
@@ -22,7 +21,7 @@ type LatestInspectorEvent =
 type ToolReports = {
   aiDetectionReport: ToolReport | null;
   currentRun: GradingRun | undefined;
-  latestEvent: LatestInspectorEvent | undefined;
+  latestEvent: LatestResultEvent | undefined;
   similarityReport: ToolReport | null;
 };
 
@@ -152,7 +151,7 @@ function scanToolReports(messages: UIMessage[]): ToolReports {
   let currentRun: GradingRun | undefined;
   let similarityReport: ToolReport | null = null;
   let aiDetectionReport: ToolReport | null = null;
-  let latestEvent: LatestInspectorEvent | undefined;
+  let latestEvent: LatestResultEvent | undefined;
 
   for (
     let messageIndex = messages.length - 1;
@@ -233,26 +232,44 @@ function reportFromPanelData(
   };
 }
 
-export function useGradingPanel(messages: UIMessage[]) {
-  const [panelOpen, setPanelOpen] = useState(false);
-  const [panelLoading, setPanelLoading] = useState(false);
-  const [panelError, setPanelError] = useState<string | null>(null);
-  const [panelData, setPanelData] = useState<GradingRunResponse | null>(null);
-  const [panelView, setPanelView] = useState<InspectorView>("source");
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(
-    null,
-  );
+const gradingRunCache = new Map<string, GradingRunResponse>();
 
+export function useGradingPanel(messages: UIMessage[]) {
   const {
     aiDetectionReport,
     currentRun,
     latestEvent,
     similarityReport,
   } = useMemo(() => scanToolReports(messages), [messages]);
-  const loadedRunId = useRef<string | null>(null);
+  const cachedPanelData = currentRun?.runId
+    ? gradingRunCache.get(currentRun.runId) ?? null
+    : null;
+
+  const [panelLoading, setPanelLoading] = useState(
+    () => Boolean(currentRun?.runId && !cachedPanelData),
+  );
+  const [panelError, setPanelError] = useState<string | null>(null);
+  const [panelData, setPanelData] = useState<GradingRunResponse | null>(
+    cachedPanelData,
+  );
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(
+    null,
+  );
+
+  const loadedRunId = useRef<string | null>(
+    cachedPanelData ? currentRun?.runId ?? null : null,
+  );
   const openedToolCallId = useRef<string | null>(null);
 
-  const refreshPanelData = useCallback(async (runId: string, targetView?: InspectorView) => {
+  const refreshPanelData = useCallback(async (runId: string, force = false) => {
+    const cached = gradingRunCache.get(runId);
+    if (cached && !force) {
+      loadedRunId.current = runId;
+      setPanelData(cached);
+      setPanelError(null);
+      return;
+    }
+
     setPanelLoading(true);
     setPanelError(null);
 
@@ -266,28 +283,17 @@ export function useGradingPanel(messages: UIMessage[]) {
         throw new Error(detail || "Could not load grading results.");
       }
       const payload = (await response.json()) as GradingRunResponse;
+      gradingRunCache.set(runId, payload);
       loadedRunId.current = runId;
       setPanelData(payload);
 
       setSelectedStudentId((current) => {
+        if (current === null) return null;
         const exists = payload.students.some(
           (student) => student.studentId === current,
         );
-        if (exists) {
-          return current;
-        }
-        return payload.students[0]?.studentId ?? null;
+        return exists ? current : null;
       });
-
-      // After data loads, switch to the target view if its report is present.
-      // This handles the case where the report wasn't yet in the message scan
-      // result when the panel first opened (e.g. a race where the similarity
-      // report arrives via R2 rather than directly from the tool output).
-      if (targetView === "similarity" && payload.similarityReport != null) {
-        setPanelView("similarity");
-      } else if (targetView === "aiDetection" && payload.aiDetectionReport != null) {
-        setPanelView("aiDetection");
-      }
     } catch (refreshError) {
       setPanelError(
         refreshError instanceof Error
@@ -306,10 +312,8 @@ export function useGradingPanel(messages: UIMessage[]) {
     void refreshPanelData(currentRun.runId);
   }, [currentRun?.runId, refreshPanelData]);
 
-  // Open the panel and switch to the relevant view whenever a tool completes.
-  // We call setPanelView directly (no setTimeout) to avoid a cleanup-race where
-  // a React re-render between the effect and a deferred callback would cancel
-  // the timeout before it fired, leaving the panel stuck on the wrong view.
+  // Refresh stored data whenever a follow-up tool completes so result tabs can
+  // use persisted reports if the tool output only returns a run reference.
   useEffect(() => {
     if (!latestEvent?.toolCallId) {
       return;
@@ -320,23 +324,11 @@ export function useGradingPanel(messages: UIMessage[]) {
     openedToolCallId.current = latestEvent.toolCallId;
 
     const eventRunId = latestEvent.runId ?? currentRun?.runId ?? null;
-    const nextView =
-      latestEvent.kind === "similarity"
-        ? "similarity"
-        : latestEvent.kind === "aiDetection"
-          ? "aiDetection"
-          : "source";
 
-    setPanelView(nextView);
-    setPanelOpen(true);
-
-    // For followup tools, refresh the stored session so the fallback reports
-    // are populated. refreshPanelData will re-apply the view once data loads,
-    // handling cases where the report isn't yet in the message scan result.
     const runIdForRefresh = latestEvent.kind !== "grading" ? eventRunId : null;
     if (runIdForRefresh) {
       queueMicrotask(() => {
-        void refreshPanelData(runIdForRefresh, nextView);
+        void refreshPanelData(runIdForRefresh, true);
       });
     }
   }, [
@@ -358,28 +350,24 @@ export function useGradingPanel(messages: UIMessage[]) {
   );
 
   const resetPanel = useCallback(() => {
-    setPanelOpen(false);
     setPanelLoading(false);
     setPanelError(null);
     setPanelData(null);
-    setPanelView("source");
     setSelectedStudentId(null);
     loadedRunId.current = null;
     openedToolCallId.current = null;
+    gradingRunCache.clear();
   }, []);
 
   return {
     aiDetectionReport: aiDetectionReport ?? fallbackAiDetectionReport,
+    hasGradingRun: currentRun !== undefined,
     panelData,
     panelError,
     panelLoading,
-    panelOpen,
-    panelView,
     resetPanel,
     selectedStudentId,
-    setPanelOpen,
     setSelectedStudentId,
-    setPanelView,
     similarityReport: similarityReport ?? fallbackSimilarityReport,
   };
 }

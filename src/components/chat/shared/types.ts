@@ -15,11 +15,9 @@ export type UploadResponse = {
   url: string;
 };
 
-export type StudentInspectorRow = StudentRow;
+export type StudentResultRow = StudentRow;
 
 export type GradingRunResponse = GradingRunSummary;
-
-export type InspectorView = "source" | "tests" | "similarity" | "aiDetection";
 
 export type ToolReport = {
   assignmentName: string | null;

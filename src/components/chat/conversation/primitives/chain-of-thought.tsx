@@ -87,7 +87,7 @@ export const ChainOfThoughtHeader = memo(
           {...props}
         >
           {leading === undefined ? <BrainIcon className="size-4" /> : leading}
-          <span className="flex-1 text-left">
+          <span className="min-w-0 text-left">
             {children ?? "Chain of Thought"}
           </span>
           <ChevronDownIcon

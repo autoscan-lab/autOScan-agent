@@ -26,6 +26,10 @@ import type { PolicyResponse, SaveState } from "./support/types";
 
 type PolicyNavItem = PolicyAssignment | "banned" | "ai";
 
+let cachedSelectedItem: PolicyNavItem = "S0";
+const cachedPolicies = new Map<PolicyAssignment, PolicyResponse>();
+let cachedGlobals: PolicyGlobalsDocument | null = null;
+
 function AssignmentRail({
   selected,
   setSelected,
@@ -114,23 +118,61 @@ function normalizedPolicyForSave(
 }
 
 export function PolicyBuilder() {
-  const [selected, setSelected] = useState<PolicyNavItem>("S0");
+  const [selected, setSelected] = useState<PolicyNavItem>(cachedSelectedItem);
   const [policyResponse, setPolicyResponse] = useState<PolicyResponse | null>(
-    null,
+    () =>
+      cachedSelectedItem === "banned" || cachedSelectedItem === "ai"
+        ? null
+        : cachedPolicies.get(cachedSelectedItem) ?? null,
   );
-  const [policyLoading, setPolicyLoading] = useState(true);
+  const [policyLoading, setPolicyLoading] = useState(
+    () =>
+      cachedSelectedItem !== "banned" &&
+      cachedSelectedItem !== "ai" &&
+      !cachedPolicies.has(cachedSelectedItem),
+  );
   const [policyError, setPolicyError] = useState<string | null>(null);
   const [policySaveState, setPolicySaveState] = useState<SaveState>("idle");
   const [globals, setGlobals] = useState<PolicyGlobalsDocument>(() =>
-    emptyGlobals(),
+    cachedGlobals ?? emptyGlobals(),
   );
   const [globalsError, setGlobalsError] = useState<string | null>(null);
   const [globalsSaveState, setGlobalsSaveState] = useState<SaveState>("idle");
 
   const policy = policyResponse?.policy ?? null;
 
+  function selectItem(item: PolicyNavItem) {
+    cachedSelectedItem = item;
+    setSelected(item);
+    setPolicyError(null);
+    if (item === "banned" || item === "ai") {
+      setPolicyLoading(false);
+      return;
+    }
+    const cached = cachedPolicies.get(item);
+    setPolicyResponse(cached ?? null);
+    setPolicyLoading(!cached);
+  }
+
+  function updatePolicyResponse(
+    assignment: PolicyAssignment,
+    response: PolicyResponse,
+  ) {
+    cachedPolicies.set(assignment, response);
+    setPolicyResponse(response);
+  }
+
+  function updateGlobals(nextGlobals: PolicyGlobalsDocument) {
+    cachedGlobals = nextGlobals;
+    setGlobals(nextGlobals);
+  }
+
   useEffect(() => {
     if (selected === "banned" || selected === "ai") {
+      return;
+    }
+
+    if (cachedPolicies.has(selected)) {
       return;
     }
 
@@ -138,19 +180,16 @@ export function PolicyBuilder() {
     const assignment = selected;
 
     async function loadPolicy() {
-      await Promise.resolve();
       if (cancelled) {
         return;
       }
 
-      setPolicyLoading(true);
-      setPolicyError(null);
       try {
         const payload = await fetchJson<PolicyResponse>(
           `/api/policies/${assignment}`,
         );
         if (!cancelled) {
-          setPolicyResponse(payload);
+          updatePolicyResponse(assignment, payload);
         }
       } catch (error) {
         if (!cancelled) {
@@ -172,6 +211,10 @@ export function PolicyBuilder() {
   }, [selected]);
 
   useEffect(() => {
+    if (cachedGlobals) {
+      return;
+    }
+
     let cancelled = false;
 
     async function loadGlobals() {
@@ -179,7 +222,7 @@ export function PolicyBuilder() {
         const payload =
           await fetchJson<PolicyGlobalsDocument>("/api/policies/globals");
         if (!cancelled) {
-          setGlobals(payload);
+          updateGlobals(payload);
         }
       } catch (error) {
         if (!cancelled) {
@@ -214,7 +257,7 @@ export function PolicyBuilder() {
           method: "PUT",
         },
       );
-      setPolicyResponse(payload);
+      updatePolicyResponse(selected, payload);
       setPolicySaveState("saved");
       window.setTimeout(() => setPolicySaveState("idle"), 1200);
     } catch (error) {
@@ -244,7 +287,7 @@ export function PolicyBuilder() {
           method: "PUT",
         },
       );
-      setGlobals(payload);
+      updateGlobals(payload);
       setGlobalsSaveState("saved");
       window.setTimeout(() => setGlobalsSaveState("idle"), 1200);
     } catch (error) {
@@ -274,7 +317,7 @@ export function PolicyBuilder() {
             <BannedFunctionsPanel
               globals={globals}
               onChange={(bannedFunctions) =>
-                setGlobals({ ...globals, bannedFunctions })
+                updateGlobals({ ...globals, bannedFunctions })
               }
               saveGlobals={() => void saveGlobals()}
               saveState={globalsSaveState}
@@ -283,7 +326,7 @@ export function PolicyBuilder() {
             <AIDictionaryPanel
               aiDictionary={globals.aiDictionary}
               onChange={(aiDictionary) =>
-                setGlobals({ ...globals, aiDictionary })
+                updateGlobals({ ...globals, aiDictionary })
               }
               saveGlobals={() => void saveGlobals()}
               saveState={globalsSaveState}
@@ -315,7 +358,7 @@ export function PolicyBuilder() {
           <PolicyEditor
             assignment={selected}
             onPolicyChange={(nextPolicy) =>
-              setPolicyResponse({
+              updatePolicyResponse(selected, {
                 assignment: selected,
                 exists: true,
                 policy: nextPolicy,
@@ -368,7 +411,7 @@ export function PolicyBuilder() {
 
       <div className="flex min-h-0 flex-1">
         <aside className="w-40 shrink-0 overflow-y-auto px-2 pt-4">
-          <AssignmentRail selected={selected} setSelected={setSelected} />
+          <AssignmentRail selected={selected} setSelected={selectItem} />
         </aside>
 
         <div className="mb-2 mr-2 mt-2 flex min-h-0 flex-1 flex-col rounded-xl border border-white/[0.04] bg-[var(--linear-panel)]">

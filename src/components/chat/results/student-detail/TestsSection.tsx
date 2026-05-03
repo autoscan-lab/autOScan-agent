@@ -1,10 +1,10 @@
 import { ArrowLeftIcon, ChevronRightIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import type { StudentInspectorRow } from "@/components/chat/support/types";
+import type { StudentResultRow } from "@/components/chat/shared/types";
 import { cn } from "@/lib/utils";
 
-type InspectorTestCase = NonNullable<StudentInspectorRow["tests"]>["cases"][number];
+type ResultTestCase = NonNullable<StudentResultRow["tests"]>["cases"][number];
 
 function diffLineTone(type: string) {
   if (type === "delete" || type === "removed" || type === "expected") {
@@ -40,13 +40,13 @@ function expectedOutputNote(outputMatch: string | null) {
 }
 
 function testCaseKey(
-  testCase: InspectorTestCase,
+  testCase: ResultTestCase,
   fallbackIndex: number,
 ) {
   return `${testCase.index ?? fallbackIndex}-${testCase.name ?? fallbackIndex}`;
 }
 
-export function TestsSection({ student }: { student: StudentInspectorRow }) {
+export function TestsSection({ student }: { student: StudentResultRow }) {
   const [selectedCaseKey, setSelectedCaseKey] = useState<string | null>(null);
   const cases = useMemo(
     () =>

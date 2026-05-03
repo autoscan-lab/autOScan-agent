@@ -1,16 +1,25 @@
-import { CodeBlockContent } from "@/components/chat/ai-elements/code-block";
-import type { StudentInspectorRow } from "@/components/chat/support/types";
-import { EmptyDetail } from "./shared";
 import { useEffect } from "react";
+import type { ReactNode } from "react";
 
-const sourceLineIdPrefix = "inspector-source-line";
+import { CodeBlockContent } from "@/components/chat/conversation/primitives/code-block";
+import type { StudentResultRow } from "@/components/chat/shared/types";
+
+function EmptyDetail({ children }: { children: ReactNode }) {
+  return (
+    <p className="rounded-md border border-[var(--linear-border-subtle)] bg-[var(--linear-ghost)] px-3 py-2 text-[13px] text-[var(--chat-text-muted)]">
+      {children}
+    </p>
+  );
+}
+
+const sourceLineIdPrefix = "student-source-line";
 
 export function SourceSection({
   highlightedLine,
   student,
 }: {
   highlightedLine: number | null;
-  student: StudentInspectorRow;
+  student: StudentResultRow;
 }) {
   useEffect(() => {
     if (!highlightedLine) {
